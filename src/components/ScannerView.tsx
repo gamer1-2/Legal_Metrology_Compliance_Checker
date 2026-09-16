@@ -562,7 +562,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
       <canvas ref={canvasRef} className="hidden" />
 
       {/* Inspection workspace header */}
-      <div className="bg-white rounded-2xl p-6 shadow-xs border border-slate-200 relative overflow-hidden">
+      <div className="inspection-hero bg-white rounded-2xl p-6 shadow-xs border border-slate-200 relative overflow-hidden">
         <div className="absolute right-0 top-0 h-full w-1 bg-orange-500" aria-hidden="true" />
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
