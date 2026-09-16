@@ -1497,7 +1497,8 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
             <button
               onClick={handleExecuteScan}
               disabled={isScanning}
-              className="w-full py-4 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm shadow-md transition-all flex items-center justify-center gap-2 active:scale-98 disabled:opacity-50 cursor-pointer"
+              data-inspection-state={isScanning ? 'analyzing' : 'ready'}
+              className="inspection-action w-full py-4 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm shadow-md transition-all flex items-center justify-center gap-2 active:scale-98 disabled:opacity-50 cursor-pointer"
             >
               {isScanning ? (
                 <>
