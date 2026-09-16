@@ -1,55 +1,69 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
-/* Hide scrollbars globally across all browsers while retaining full touch and mouse wheel scroll functionality */
-html,
-body,
-#root,
-* {
-  scrollbar-width: none !important; /* Firefox */
-  -ms-overflow-style: none !important; /* IE and Edge */
+:root {
+  --paper: #f7f4ed;
+  --surface: #fffcf6;
+  --surface-2: #eeebe3;
+  --ink: #171717;
+  --ink-2: #3a3a37;
+  --muted: #77746d;
+  --border: #d8d3c8;
+  --vermilion: #e4572e;
+  --vermilion-deep: #b93b1f;
+  --vermilion-soft: #f7d8ce;
+  --brass: #b38a3e;
+  --brass-soft: #efe4c9;
+  --green: #2f6b4f;
+  --green-soft: #dcebe2;
+  --warning: #a66a16;
+  --warning-soft: #f3e5c7;
+  --danger: #b93832;
+  --danger-soft: #f3d9d7;
+  --info: #315b7d;
+  --info-soft: #dde8f0;
 }
 
-/* Chrome, Safari, Edge (Chromium), Opera */
-*::-webkit-scrollbar,
-html::-webkit-scrollbar,
-body::-webkit-scrollbar,
-#root::-webkit-scrollbar,
-::-webkit-scrollbar {
-  display: none !important;
-  width: 0 !important;
-  height: 0 !important;
-  background: transparent !important;
+* { box-sizing: border-box; }
+html, body, #root { min-height: 100%; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
+button, input, select, textarea { font: inherit; }
+button { transition: background-color 160ms ease-out, color 160ms ease-out, border-color 160ms ease-out, transform 160ms ease-out; }
+button:active { transform: scale(.98); }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--vermilion); outline-offset: 2px; }
 
-::-webkit-scrollbar-button {
-  display: none !important;
-  width: 0 !important;
-  height: 0 !important;
+/* Keep the product's information-dense surfaces crisp and document-like. */
+.font-mono, code, .font-mono * { font-family: 'DM Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+.bg-slate-100 { background-color: var(--paper) !important; }
+.bg-white { background-color: var(--surface) !important; }
+.bg-slate-900 { background-color: var(--ink) !important; }
+.text-slate-900 { color: var(--ink) !important; }
+.text-slate-800, .text-slate-700 { color: var(--ink-2) !important; }
+.text-slate-600, .text-slate-500, .text-slate-400 { color: var(--muted) !important; }
+.border-slate-200, .border-slate-100 { border-color: var(--border) !important; }
+.bg-emerald-600, .bg-emerald-700 { background-color: var(--vermilion) !important; }
+.bg-emerald-600:hover { background-color: var(--vermilion-deep) !important; }
+.text-emerald-600, .text-emerald-700, .text-emerald-400 { color: var(--green) !important; }
+.bg-emerald-50, .bg-emerald-100 { background-color: var(--green-soft) !important; }
+.border-emerald-200 { border-color: #b8d4c2 !important; }
+.rounded-xl, .rounded-2xl { border-radius: 8px !important; }
+.rounded-lg { border-radius: 6px !important; }
+.shadow-2xs, .shadow-sm, .shadow-md, .shadow-lg { box-shadow: 0 1px 0 rgba(23,23,23,.05) !important; }
+
+/* Technical paper texture: subtle enough to stay quiet, visible enough to own the surface. */
+#root { background-image: linear-gradient(rgba(23,23,23,.018) 1px, transparent 1px), linear-gradient(90deg, rgba(23,23,23,.018) 1px, transparent 1px); background-size: 32px 32px; }
+.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
-
-::-webkit-scrollbar-thumb {
-  display: none !important;
-  background: transparent !important;
-}
-
-::-webkit-scrollbar-track {
-  display: none !important;
-  background: transparent !important;
-}
-
-::-webkit-scrollbar-corner {
-  display: none !important;
-  background: transparent !important;
-}
-
-.no-scrollbar {
-  scrollbar-width: none !important;
-  -ms-overflow-style: none !important;
-}
-
-.no-scrollbar::-webkit-scrollbar {
-  display: none !important;
-  width: 0 !important;
-  height: 0 !important;
-  background: transparent !important;
+@media (max-width: 768px) {
+  #root { background-size: 24px 24px; }
 }

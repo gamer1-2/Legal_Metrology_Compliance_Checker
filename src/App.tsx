@@ -181,7 +181,7 @@ export default function App() {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top App Bar with Breadcrumbs & Fast Action Buttons */}
-        <header className="bg-white border-b border-slate-200 px-4 sm:px-6 py-3 shrink-0 flex items-center justify-between gap-4 select-none print:hidden shadow-2xs">
+        <header className="bg-white border-b border-slate-200 px-4 sm:px-6 py-3 shrink-0 flex items-center justify-between gap-4 select-none print:hidden">
           <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={() => setIsMobileMenuOpen(true)}
@@ -191,19 +191,19 @@ export default function App() {
             </button>
 
             <div className="flex items-center gap-2 text-xs text-slate-500 truncate">
-              <span className="font-semibold text-slate-700 hidden sm:inline">Packaging Inspector</span>
+              <span className="font-mono text-[10px] tracking-[.15em] text-orange-600 hidden sm:inline">METROLOGY DESK</span>
               <ChevronRight className="w-3.5 h-3.5 text-slate-400 hidden sm:inline" />
-              <span className="font-bold text-slate-900 font-mono">{pageTitles[activePage]}</span>
+              <span className="font-semibold text-slate-900">{pageTitles[activePage]}</span>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsServerModalOpen(true)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-colors cursor-pointer"
               title="Configure Backend Server Endpoint"
             >
-              <Server className="w-3.5 h-3.5 text-emerald-600" />
+                <Server className="w-3.5 h-3.5 text-orange-600" />
               <span className="hidden sm:inline">
                 {getStoredBackendUrl() ? 'Server: Custom' : isNativeApkRuntime() ? 'Server (APK)' : 'Server'}
               </span>

@@ -1,283 +1,40 @@
 import React from 'react';
-import {
-  BarChart3,
-  TrendingUp,
-  AlertTriangle,
-  CheckCircle2,
-  XCircle,
-  FileText,
-  Building,
-  Scale,
-  ShieldAlert,
-} from 'lucide-react';
+import { BarChart3, AlertTriangle, CheckCircle2, ArrowUpRight, ShieldAlert, Building2, Clock3, ScanLine } from 'lucide-react';
 import { InspectionResult } from '../types/compliance';
 
-interface DashboardViewProps {
-  inspections: InspectionResult[];
-  onSelectInspection: (inspection: InspectionResult) => void;
-}
+interface DashboardViewProps { inspections: InspectionResult[]; onSelectInspection: (inspection: InspectionResult) => void; }
 
-export const DashboardView: React.FC<DashboardViewProps> = ({
-  inspections,
-  onSelectInspection,
-}) => {
+export const DashboardView: React.FC<DashboardViewProps> = ({ inspections, onSelectInspection }) => {
   const total = inspections.length;
-  const compliant = inspections.filter((x) => x.overallVerdict === 'COMPLIANT').length;
-  const nonCompliant = inspections.filter((x) => x.overallVerdict === 'NON_COMPLIANT').length;
-  const serious = inspections.filter((x) => x.overallVerdict === 'SERIOUS_VIOLATION').length;
-  const complianceRate = total > 0 ? Math.round((compliant / total) * 100) : 0;
-
-  // Analyze specific violation patterns across inspected records
-  const violationStats = {
-    missingUsp: 0,
-    nonStandardUnits: 0,
-    missingConsumerEmail: 0,
-    taxesExtra: 0,
-    fontHeightDeficit: 0,
-    incompleteAddress: 0,
-  };
-
-  inspections.forEach((insp) => {
-    if (!insp.declarations.unitSalePrice?.isCompliant) violationStats.missingUsp++;
-    if (!insp.declarations.netQuantity?.isStandardUnit || insp.declarations.netQuantity?.hasProhibitedQualifiers) {
-      violationStats.nonStandardUnits++;
-    }
-    if (!insp.declarations.consumerCare?.emailId) violationStats.missingConsumerEmail++;
-    if (insp.declarations.mrp?.hasTaxesExtraViolation) violationStats.taxesExtra++;
-    if (!insp.readability?.isFontHeightCompliant) violationStats.fontHeightDeficit++;
-    if (!insp.declarations.manufacturerDetails?.pinCodeDeclared) violationStats.incompleteAddress++;
-  });
-
-  const violationBars = [
-    {
-      label: 'Unit Sale Price (USP) Missing or Inconsistent',
-      count: violationStats.missingUsp,
-      pct: Math.min(100, Math.round((violationStats.missingUsp / total) * 100)),
-      act: 'Pricing Requirement',
-    },
-    {
-      label: 'Non-Standard Metric Units ("gms", "ltr", "pcs")',
-      count: violationStats.nonStandardUnits,
-      pct: Math.min(100, Math.round((violationStats.nonStandardUnits / total) * 100)),
-      act: 'Units Requirement',
-    },
-    {
-      label: 'Customer Care Missing Email or Helpline Phone',
-      count: violationStats.missingConsumerEmail,
-      pct: Math.min(100, Math.round((violationStats.missingConsumerEmail / total) * 100)),
-      act: 'Support Requirement',
-    },
-    {
-      label: 'Print Font Size Below Minimum Legibility Threshold',
-      count: violationStats.fontHeightDeficit,
-      pct: Math.min(100, Math.round((violationStats.fontHeightDeficit / total) * 100)),
-      act: 'Readability Standard',
-    },
-    {
-      label: 'MRP Lacking All-Inclusive Taxes Declaration',
-      count: violationStats.taxesExtra,
-      pct: Math.min(100, Math.round((violationStats.taxesExtra / total) * 100)),
-      act: 'Pricing Standard',
-    },
-    {
-      label: 'Manufacturer Address Missing Postal PIN Code',
-      count: violationStats.incompleteAddress,
-      pct: Math.min(100, Math.round((violationStats.incompleteAddress / total) * 100)),
-      act: 'Address Standard',
-    },
+  const compliant = inspections.filter(x => x.overallVerdict === 'COMPLIANT').length;
+  const nonCompliant = inspections.filter(x => x.overallVerdict === 'NON_COMPLIANT').length;
+  const serious = inspections.filter(x => x.overallVerdict === 'SERIOUS_VIOLATION').length;
+  const complianceRate = total ? Math.round((compliant / total) * 100) : 0;
+  const count = (fn: (x: InspectionResult) => boolean) => inspections.filter(fn).length;
+  const findings = [
+    ['Unit sale price', count(x => !x.declarations.unitSalePrice?.isCompliant), 'Pricing requirement'],
+    ['Standard metric units', count(x => !x.declarations.netQuantity?.isStandardUnit || !!x.declarations.netQuantity?.hasProhibitedQualifiers), 'Units requirement'],
+    ['Consumer care contact', count(x => !x.declarations.consumerCare?.emailId), 'Support requirement'],
+    ['Minimum font height', count(x => !x.readability?.isFontHeightCompliant), 'Readability standard'],
+    ['All-inclusive MRP', count(x => !!x.declarations.mrp?.hasTaxesExtraViolation), 'Pricing standard'],
   ];
-
-  return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      <div>
-        <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-          <BarChart3 className="w-5 h-5 text-emerald-600" />
-          Packaging Compliance Analytics
-        </h2>
-        <p className="text-xs text-slate-600 mt-0.5">
-          Overview of inspected products, compliance trends, and common packaging defects.
-        </p>
-      </div>
-
-      {/* Top Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs space-y-1">
-          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Surveillance Audits</span>
-          <div className="flex items-baseline justify-between">
-            <span className="text-3xl font-black text-slate-900">{inspections.length}</span>
-            <span className="text-xs text-emerald-700 font-semibold flex items-center gap-0.5">
-              <TrendingUp className="w-3.5 h-3.5" /> 100% active
-            </span>
-          </div>
-          <span className="text-xs text-slate-500 block">Total digital scans executed</span>
-        </div>
-
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs space-y-1">
-          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Compliance Rate</span>
-          <div className="flex items-baseline justify-between">
-            <span className="text-3xl font-black text-emerald-700">{complianceRate}%</span>
-            <span className="text-xs text-slate-500 font-medium">LMPC Benchmark</span>
-          </div>
-          <span className="text-xs text-slate-500 block">Commodities passing all Rule 6 clauses</span>
-        </div>
-
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs space-y-1">
-          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Notice Referrals</span>
-          <div className="flex items-baseline justify-between">
-            <span className="text-3xl font-black text-amber-700">{nonCompliant + serious}</span>
-            <span className="text-xs text-rose-600 font-semibold">{serious} Severe</span>
-          </div>
-          <span className="text-xs text-slate-500 block">Form 1 Show-Cause Notices required</span>
-        </div>
-
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs space-y-1">
-          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Estimated Penalty Pool</span>
-          <div className="flex items-baseline justify-between">
-            <span className="text-3xl font-black text-slate-900">
-              ₹ {((nonCompliant + serious) * 25000).toLocaleString('en-IN')}
-            </span>
-            <span className="text-xs text-slate-500">Sec 36(1)</span>
-          </div>
-          <span className="text-xs text-slate-500 block">Maximum compounding value</span>
-        </div>
-      </div>
-
-      {/* Main Analysis Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left: Top Violations Breakdown (8 cols) */}
-        <div className="lg:col-span-8 bg-white rounded-xl border border-slate-200 p-6 shadow-2xs space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                <ShieldAlert className="w-4 h-4 text-rose-600" />
-                Statutory Contravention Frequency
-              </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Most prevalent packaging defects identified during automated label audits.
-              </p>
-            </div>
-            <span className="text-xs text-slate-400 font-mono">LMPC 2011 + 2022 USP</span>
-          </div>
-
-          <div className="space-y-4">
-            {violationBars.map((bar, i) => (
-              <div key={i} className="space-y-1.5">
-                <div className="flex justify-between text-xs font-semibold">
-                  <span className="text-slate-800">{bar.label}</span>
-                  <span className="text-slate-500">
-                    <strong className="text-slate-900">{bar.count}</strong> occurrences ({bar.pct}%)
-                  </span>
-                </div>
-                <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                  <div
-                    className={`h-2 rounded-full transition-all ${
-                      bar.count > 0 ? 'bg-rose-500' : 'bg-slate-300'
-                    }`}
-                    style={{ width: `${Math.max(bar.pct, 4)}%` }}
-                  ></div>
-                </div>
-                <span className="text-[10px] text-slate-400 block font-mono">{bar.act}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Right: Sectoral Breakdown & Actions (4 cols) */}
-        <div className="lg:col-span-4 space-y-6">
-          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-2xs space-y-4">
-            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-              <Building className="w-4 h-4 text-emerald-600" />
-              Category Distribution
-            </h3>
-
-            <div className="space-y-3 text-xs">
-              <div className="flex justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-200">
-                <span className="text-slate-700 font-medium">Food &amp; Edibles</span>
-                <span className="font-bold text-slate-900">
-                  {inspections.filter((x) => x.category === 'FOOD_AND_BEVERAGES').length} audited
-                </span>
-              </div>
-
-              <div className="flex justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-200">
-                <span className="text-slate-700 font-medium">Personal Care &amp; Cosmetics</span>
-                <span className="font-bold text-slate-900">
-                  {inspections.filter((x) => x.category === 'PERSONAL_CARE').length} audited
-                </span>
-              </div>
-
-              <div className="flex justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-200">
-                <span className="text-slate-700 font-medium">Household Goods</span>
-                <span className="font-bold text-slate-900">
-                  {inspections.filter((x) => x.category === 'HOUSEHOLD').length} audited
-                </span>
-              </div>
-
-              <div className="flex justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-200">
-                <span className="text-slate-700 font-medium">General Commodities</span>
-                <span className="font-bold text-slate-900">
-                  {inspections.filter((x) => x.category === 'COMMODITIES').length} audited
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-emerald-50 rounded-xl border border-emerald-200 p-5 space-y-2 text-xs text-emerald-900">
-            <h4 className="font-bold text-emerald-950 flex items-center gap-1.5">
-              <Scale className="w-4 h-4 text-emerald-700" />
-              Surveillance Directive
-            </h4>
-            <p className="leading-relaxed text-emerald-900/90">
-              Surveillance teams are instructed to check <strong>imported goods</strong> for complete country of origin
-              declarations and verify that the <strong>Unit Sale Price</strong> is correctly rounded off to two decimal
-              places.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Recent Inspection Activity Feed */}
-      <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-2xs space-y-4">
-        <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-          Recent Surveillance Field Activity
-        </h3>
-
-        <div className="space-y-2">
-          {inspections.length === 0 ? (
-            <div className="p-8 text-center text-slate-400 text-xs">
-              No recent field inspection records found. Audits will automatically record as real products are investigated.
-            </div>
-          ) : (
-            inspections.slice(0, 5).map((item) => (
-              <div
-                key={item.id}
-                onClick={() => onSelectInspection(item)}
-                className="p-3 rounded-lg border border-slate-100 hover:bg-slate-50 transition-colors flex items-center justify-between cursor-pointer text-xs"
-              >
-                <div className="flex items-center gap-3">
-                  <span
-                    className={`w-2 h-2 rounded-full shrink-0 ${
-                      item.overallVerdict === 'COMPLIANT'
-                        ? 'bg-emerald-500'
-                        : item.overallVerdict === 'SERIOUS_VIOLATION'
-                        ? 'bg-rose-500'
-                        : 'bg-amber-500'
-                    }`}
-                  ></span>
-                  <div>
-                    <span className="font-bold text-slate-800">{item.productName}</span>
-                    <span className="text-slate-500 ml-2">({item.brandName})</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4">
-                  <span className="text-slate-500">{new Date(item.timestamp).toLocaleDateString('en-IN')}</span>
-                  <span className="font-bold text-slate-700">{item.complianceScore}%</span>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    </div>
-  );
+  const verdict = (item: InspectionResult) => item.overallVerdict === 'COMPLIANT' ? { label: 'COMPLIANT', cls: 'text-[#2f6b4f] bg-[#dcebe2]' } : item.overallVerdict === 'SERIOUS_VIOLATION' ? { label: 'SERIOUS', cls: 'text-[#b93832] bg-[#f3d9d7]' } : { label: 'REVIEW', cls: 'text-[#a66a16] bg-[#f3e5c7]' };
+  return <div className="max-w-[1440px] mx-auto px-4 sm:px-8 py-7 space-y-7">
+    <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-[#d8d3c8] pb-6">
+      <div><div className="font-mono text-[10px] tracking-[.2em] text-[#b38a3e] mb-3">01 / OVERVIEW</div><h1 className="text-3xl md:text-4xl font-bold tracking-tight text-[#171717]">Inspection command center</h1><p className="text-sm text-[#77746d] mt-2 max-w-xl">A live view of field activity, declaration integrity, and items requiring officer attention.</p></div>
+      <div className="font-mono text-[11px] text-[#77746d]">DATASET / LOCAL REPOSITORY<br/><span className="text-[#171717]">{new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()}</span></div>
+    </header>
+    <section className="grid grid-cols-1 lg:grid-cols-[1.35fr_.65fr] gap-5">
+      <div className="bg-[#171717] text-[#fffcf6] p-6 md:p-8 relative overflow-hidden min-h-[230px] flex flex-col justify-between"><div className="absolute right-0 top-0 w-40 h-full opacity-20" style={{ backgroundImage: 'linear-gradient(90deg, transparent 49%, #f7f4ed 50%, transparent 51%), linear-gradient(0deg, transparent 49%, #f7f4ed 50%, transparent 51%)', backgroundSize: '20px 20px' }} /><div className="relative"><div className="flex items-center gap-2 text-[#f7d8ce] text-xs font-mono tracking-wider"><ScanLine className="w-4 h-4" /> FIELD ACTIVITY</div><div className="text-6xl font-bold mt-5 tracking-tight">{total.toString().padStart(2, '0')}</div><div className="text-sm text-[#bdb9b0] mt-1">packaged commodities inspected</div></div><div className="relative flex items-center gap-3 text-xs"><span className="w-2 h-2 bg-[#e4572e] rounded-full" /> Repository is ready for the next inspection</div></div>
+      <div className="bg-[#fffcf6] border border-[#d8d3c8] p-6 flex flex-col justify-between"><div className="flex items-center justify-between"><span className="font-mono text-[10px] tracking-wider text-[#77746d]">DECLARATION INTEGRITY</span><CheckCircle2 className="w-5 h-5 text-[#2f6b4f]" /></div><div><div className="text-5xl font-bold mt-8 text-[#2f6b4f]">{complianceRate}<span className="text-2xl">%</span></div><p className="text-sm text-[#77746d] mt-1">passing all recorded checks</p></div><div className="h-1.5 bg-[#eeebe3] mt-5"><div className="h-full bg-[#2f6b4f]" style={{ width: `${complianceRate}%` }} /></div></div>
+    </section>
+    <section className="grid grid-cols-2 lg:grid-cols-4 border-y border-[#d8d3c8] bg-[#fffcf6]">
+      {[['COMPLIANT', compliant, 'text-[#2f6b4f]'], ['REVIEW REQUIRED', nonCompliant, 'text-[#a66a16]'], ['SERIOUS VIOLATIONS', serious, 'text-[#b93832]'], ['REFERRAL VALUE', `₹${((nonCompliant + serious) * 25000).toLocaleString('en-IN')}`, 'text-[#171717]']].map(([label, value, cls], i) => <div key={label} className={`p-5 ${i ? 'border-l border-[#d8d3c8]' : ''}`}><div className="font-mono text-[10px] text-[#77746d] tracking-wider">{label}</div><div className={`text-2xl font-bold mt-3 ${cls}`}>{value}</div></div>)}
+    </section>
+    <section className="grid grid-cols-1 lg:grid-cols-[1.1fr_.9fr] gap-5">
+      <div className="bg-[#fffcf6] border border-[#d8d3c8] p-6"><div className="flex items-start justify-between mb-6"><div><div className="font-mono text-[10px] tracking-wider text-[#b38a3e]">02 / FINDINGS</div><h2 className="text-lg font-bold mt-2">Most frequent discrepancies</h2></div><ShieldAlert className="w-5 h-5 text-[#b93832]" /></div><div className="space-y-5">{findings.map(([label, value, ref]) => { const pct = total ? Math.round((Number(value) / total) * 100) : 0; return <div key={label}><div className="flex justify-between text-sm"><span className="font-semibold">{label}</span><span className="font-mono text-xs text-[#77746d]">{value} / {total}</span></div><div className="h-1.5 bg-[#eeebe3] mt-2"><div className={`h-full ${Number(value) ? 'bg-[#e4572e]' : 'bg-[#d8d3c8]'}`} style={{ width: `${Math.max(Number(value) ? pct : 0, Number(value) ? 5 : 0)}%` }} /></div><div className="font-mono text-[10px] text-[#77746d] mt-1">{ref}</div></div>})}</div></div>
+      <div className="bg-[#eeebe3] border border-[#d8d3c8] p-6"><div className="font-mono text-[10px] tracking-wider text-[#b38a3e]">03 / PRIORITY QUEUE</div><h2 className="text-lg font-bold mt-2 mb-5">Recent inspections</h2>{inspections.length === 0 ? <div className="py-12 text-center text-sm text-[#77746d] border-t border-[#d8d3c8]">No field records yet.<br/>Start an inspection to populate this queue.</div> : <div className="space-y-1">{inspections.slice(0, 5).map(item => { const v = verdict(item); return <button key={item.id} onClick={() => onSelectInspection(item)} className="w-full text-left flex items-center gap-3 py-3 border-t border-[#d8d3c8] hover:bg-[#f7f4ed] px-2 -mx-2"><span className={`w-2 h-2 rounded-full ${item.overallVerdict === 'COMPLIANT' ? 'bg-[#2f6b4f]' : item.overallVerdict === 'SERIOUS_VIOLATION' ? 'bg-[#b93832]' : 'bg-[#a66a16]'}`} /><span className="min-w-0 flex-1"><span className="block text-sm font-semibold truncate">{item.productName}</span><span className="font-mono text-[10px] text-[#77746d]">{item.id}</span></span><span className={`text-[10px] font-mono px-1.5 py-1 ${v.cls}`}>{v.label}</span><ArrowUpRight className="w-4 h-4 text-[#77746d]" /></button>})}</div>}</div>
+    </section>
+    <div className="flex flex-wrap gap-4 text-[11px] text-[#77746d] font-mono"><span className="flex items-center gap-2"><Clock3 className="w-3.5 h-3.5" /> RECORDS / {total}</span><span className="flex items-center gap-2"><Building2 className="w-3.5 h-3.5" /> LMPC / 2011 + USP / 2022</span><span className="flex items-center gap-2"><AlertTriangle className="w-3.5 h-3.5" /> {nonCompliant + serious} REFERRALS</span></div>
+  </div>;
 };
