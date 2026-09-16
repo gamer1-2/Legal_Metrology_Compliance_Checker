@@ -142,15 +142,16 @@ export const RepositoryView: React.FC<RepositoryViewProps> = ({
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-      {/* Header */}
+      {/* Records header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
-          <h2 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-            <FolderArchive className="w-6 h-6 text-emerald-600" />
-            Inspection History &amp; Records
+          <div className="text-[10px] font-mono tracking-[.18em] text-[#b38a3e] mb-2">05 / RECORDS</div>
+          <h2 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+            <FolderArchive className="w-5 h-5 text-orange-600" />
+            Inspection register
           </h2>
           <p className="text-xs text-slate-600 mt-1">
-            Archive of completed product inspections, compliance verdicts, and stored case files.
+            Search, retrieve, and export completed product inspections and evidence trails.
           </p>
         </div>
 

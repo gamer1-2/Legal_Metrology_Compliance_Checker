@@ -264,11 +264,14 @@ export const ComplianceReportView: React.FC<ComplianceReportViewProps> = ({
         </div>
       </div>
 
-      {/* Main Inspection Banner Card */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-xs">
+      {/* Main Inspection Result */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-xs relative overflow-hidden">
+        <div className={`absolute left-0 top-0 bottom-0 w-1 ${isCompliant ? 'bg-emerald-600' : 'bg-rose-600'}`} aria-hidden="true" />
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-slate-100">
           <div className="space-y-1.5">
             <div className="flex items-center gap-2">
+              <span className="text-[10px] font-mono tracking-[.18em] text-[#b38a3e]">04 / RESULT</span>
+              <span className="text-slate-300">·</span>
               <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 font-mono">
                 {report.id}
               </span>
@@ -312,7 +315,7 @@ export const ComplianceReportView: React.FC<ComplianceReportViewProps> = ({
                 ) : (
                   <XCircle className="w-3.5 h-3.5 text-rose-600" />
                 )}
-                {isCompliant ? 'COMPLIANT' : 'VIOLATIONS DETECTED'}
+                {isCompliant ? 'COMPLIANT' : isSerious ? 'SERIOUS VIOLATION' : 'REVIEW REQUIRED'}
               </span>
             </div>
 

@@ -561,21 +561,21 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
       {/* Hidden canvas for snapshot rendering */}
       <canvas ref={canvasRef} className="hidden" />
 
-      {/* Clean, Modern Header */}
-      <div className="bg-white rounded-2xl p-6 shadow-xs border border-slate-200">
+      {/* Inspection workspace header */}
+      <div className="bg-white rounded-2xl p-6 shadow-xs border border-slate-200 relative overflow-hidden">
+        <div className="absolute right-0 top-0 h-full w-1 bg-orange-500" aria-hidden="true" />
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">
-                Packaging Compliance Scanner
+              <span className="text-[10px] font-mono tracking-[.18em] text-[#b38a3e]">
+                01 / CAPTURE &amp; INSPECT
               </span>
             </div>
-            <h1 className="text-2xl font-black text-slate-900 mt-1">
-              Product Label Inspector
+            <h1 className="text-2xl font-bold text-slate-900 mt-2">
+              Product label inspection
             </h1>
             <p className="text-xs text-slate-500 mt-1 max-w-2xl">
-              Capture or upload packaging photographs to instantly inspect all mandatory product declarations, pricing, dates, and label standards.
+              Acquire the evidence set, extract mandatory declarations, and verify the package against Legal Metrology requirements.
             </p>
           </div>
 
