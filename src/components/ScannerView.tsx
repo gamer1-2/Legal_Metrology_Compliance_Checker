@@ -562,7 +562,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
       <canvas ref={canvasRef} className="hidden" />
 
       {/* Inspection workspace header */}
-      <div className="inspection-hero bg-white rounded-2xl p-6 sm:p-8 shadow-xs border border-slate-200 relative overflow-hidden">
+      <div data-reveal="hero" className="inspection-hero bg-white rounded-2xl p-6 sm:p-8 shadow-xs border border-slate-200 relative overflow-hidden">
         <div className="absolute right-0 top-0 h-full w-1 bg-orange-500" aria-hidden="true" />
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -645,7 +645,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
       </div>
 
       {/* Quick History Access Strip (Synced with real investigations - top recent only) */}
-      <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-2xs space-y-2.5">
+      <div data-reveal="history" className="bg-white rounded-2xl p-4 border border-slate-200 shadow-2xs space-y-2.5">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <span className={`w-2 h-2 rounded-full shrink-0 ${recentInspections.length > 0 ? 'bg-emerald-500' : 'bg-slate-300'}`}></span>
@@ -712,7 +712,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
       </div>
 
       {/* Main Scanner Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div data-reveal="workspace" className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column: Camera Viewfinder & Photos (7 cols) */}
         <div className="lg:col-span-7 space-y-5">
           {/* Mode Switcher */}

@@ -55,6 +55,21 @@ h1, h2, h3 { letter-spacing: -.025em; }
 .scanner-page main, .scanner-page section { scroll-margin-top: 1rem; }
 @media (max-width: 640px) { .scanner-page::before { display: none; } .inspection-hero .workflow-rail::before { display: none; } .workflow-step { width: 50%; } }
 
+/* Motion language: measured, quick, and tied to entering the inspection workspace. */
+[data-reveal] { opacity: 0; transform: translate3d(0, 18px, 0); transition: opacity 520ms var(--ease-out), transform 520ms var(--ease-out); }
+[data-reveal].is-visible { opacity: 1; transform: translate3d(0, 0, 0); }
+[data-reveal="history"] { transition-delay: 70ms; }
+[data-reveal="workspace"] { transition-delay: 130ms; }
+.workflow-step { opacity: 0; transform: translate3d(-8px, 0, 0); transition: opacity 420ms var(--ease-out), transform 420ms var(--ease-out); }
+.is-visible .workflow-step { opacity: 1; transform: translate3d(0, 0, 0); }
+.is-visible .workflow-step:nth-of-type(3) { transition-delay: 70ms; }
+.is-visible .workflow-step:nth-of-type(5) { transition-delay: 140ms; }
+.is-visible .workflow-step:nth-of-type(7) { transition-delay: 210ms; }
+.scanner-page [class*="hover:border-emerald"] { transition: transform 180ms var(--ease-out), border-color 180ms var(--ease-out), background-color 180ms var(--ease-out), box-shadow 180ms var(--ease-out); }
+.scanner-page [class*="hover:border-emerald"]:hover { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(23,23,23,.06); }
+.scanner-page .inspection-hero:hover::before { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) { [data-reveal], .workflow-step { opacity: 1; transform: none; transition: none; } }
+
 /* Shared token bridge for the existing component library. */
 .bg-slate-100 { background-color: var(--paper) !important; }
 .bg-slate-50 { background-color: var(--surface-2) !important; }
