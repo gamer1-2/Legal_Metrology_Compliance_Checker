@@ -2,7 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { analyzePackageWithGemini } from './server/geminiService.ts';
+import { analyzePackageWithGemini, decodeBarcodeWithGemini } from './server/geminiService.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -10,7 +10,8 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = 3000;
 
-app.use(express.json({ limit: '25mb' }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Enable CORS so Android native APK / mobile devices on local Wi-Fi can connect
 app.use((req, res, next) => {
@@ -117,6 +118,24 @@ app.post('/api/verify-qr-url', async (req, res) => {
   }
 });
 
+app.post('/api/decode-barcode', async (req, res) => {
+  try {
+    const { imageBase64 } = req.body;
+    if (!imageBase64 || typeof imageBase64 !== 'string') {
+      return res.status(400).json({ detected: false, error: 'imageBase64 string is required' });
+    }
+
+    const result = await decodeBarcodeWithGemini(imageBase64);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Error decoding barcode via Gemini:', err);
+    res.status(500).json({
+      detected: false,
+      error: err?.message || 'Failed to decode barcode from image',
+    });
+  }
+});
+
 // Serve static files from dist in production
 app.use(express.static(path.join(__dirname, 'dist')));
 
@@ -124,6 +143,8 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`LMPC Compliance Checker server running on http://0.0.0.0:${PORT}`);
 });
+server.setTimeout(120000);
+server.keepAliveTimeout = 65000;

@@ -1,5 +1,6 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { InspectionResult, ExtractedDeclarations, RuleEvaluationItem, ReadabilityAnalysis } from '../types/compliance';
+import { optimizeImageForOcr } from '../utils/imageOptimizer';
 
 /**
  * Client-side compliance service and local fallback engine
@@ -187,14 +188,38 @@ export async function analyzeProductImage(
   const baseUrl = getApiBaseUrl();
   const apiUrl = `${baseUrl}/api/analyze`;
 
+  // Pre-optimize all images before transmission to prevent socket timeouts and OOM errors
+  const [optPrimary, optBack, optSide, optMacro] = await Promise.all([
+    optimizeImageForOcr(imageBase64, 1600, 0.85),
+    meta?.backPanelBase64 ? optimizeImageForOcr(meta.backPanelBase64, 1600, 0.85) : Promise.resolve(undefined),
+    meta?.sidePanelBase64 ? optimizeImageForOcr(meta.sidePanelBase64, 1600, 0.85) : Promise.resolve(undefined),
+    meta?.macroBase64 ? optimizeImageForOcr(meta.macroBase64, 1600, 0.85) : Promise.resolve(undefined),
+  ]);
+
+  let optAdditional: string[] | undefined = undefined;
+  if (meta?.additionalImages && meta.additionalImages.length > 0) {
+    optAdditional = await Promise.all(
+      meta.additionalImages.map((img) => optimizeImageForOcr(img, 1600, 0.85))
+    );
+  }
+
+  // Clean additionalContext to strip duplicated multi-megabyte image base64 strings
+  const cleanContext = meta ? { ...meta } : undefined;
+  if (cleanContext) {
+    delete cleanContext.backPanelBase64;
+    delete cleanContext.sidePanelBase64;
+    delete cleanContext.macroBase64;
+    delete cleanContext.additionalImages;
+  }
+
   const payload = {
-    imageBase64,
+    imageBase64: optPrimary,
     mimeType: mimeType || 'image/jpeg',
-    additionalContext: meta,
-    backPanelBase64: meta?.backPanelBase64,
-    sidePanelBase64: meta?.sidePanelBase64,
-    macroBase64: meta?.macroBase64,
-    additionalImages: meta?.additionalImages,
+    additionalContext: cleanContext,
+    backPanelBase64: optBack,
+    sidePanelBase64: optSide,
+    macroBase64: optMacro,
+    additionalImages: optAdditional,
     dimensions: meta?.dimensions,
   };
 
@@ -208,8 +233,8 @@ export async function analyzeProductImage(
           Accept: 'application/json',
         },
         data: payload,
-        connectTimeout: 45000,
-        readTimeout: 45000,
+        connectTimeout: 30000,
+        readTimeout: 90000,
       });
 
       const data = typeof nativeRes.data === 'string' ? JSON.parse(nativeRes.data) : nativeRes.data;
@@ -224,6 +249,16 @@ export async function analyzeProductImage(
       }
     } catch (nativeErr: any) {
       console.warn('Native CapacitorHttp analysis error, attempting web fetch fallback:', nativeErr);
+      const isTimeout =
+        nativeErr?.message === 'timeout' ||
+        String(nativeErr?.message || '').toLowerCase().includes('timeout') ||
+        String(nativeErr || '').toLowerCase().includes('timeout');
+
+      if (isTimeout) {
+        throw new Error(
+          'Connection timed out waiting for server analysis. Please verify your PC server is running and reachable on your Wi-Fi network.'
+        );
+      }
       if (nativeErr?.message && !nativeErr.message.includes('not implemented')) {
         throw nativeErr;
       }
@@ -232,6 +267,9 @@ export async function analyzeProductImage(
 
   // 2. Browser fetch fallback
   try {
+    const controller = new AbortController();
+    const timeoutTimer = setTimeout(() => controller.abort(), 90000);
+
     const res = await fetch(apiUrl, {
       method: 'POST',
       headers: {
@@ -239,7 +277,9 @@ export async function analyzeProductImage(
         Accept: 'application/json',
       },
       body: JSON.stringify(payload),
+      signal: controller.signal,
     });
+    clearTimeout(timeoutTimer);
 
     const contentType = res.headers.get('content-type') || '';
     if (contentType.includes('text/html') || res.url.includes('__cookie_check') || res.url.includes('google.com/accounts')) {
@@ -270,6 +310,11 @@ export async function analyzeProductImage(
     throw new Error('Server returned an empty or malformed response. Please verify the analysis server.');
   } catch (netErr: any) {
     console.error('LMPC analysis execution error:', netErr);
+    if (netErr?.name === 'AbortError' || String(netErr?.message || '').toLowerCase().includes('timeout')) {
+      throw new Error(
+        'Connection timed out waiting for server analysis. Please verify your PC server is running and reachable on your Wi-Fi network.'
+      );
+    }
     throw new Error(
       netErr?.message ||
         'Failed to inspect package image. Please verify your connection to the analysis server and try again.'

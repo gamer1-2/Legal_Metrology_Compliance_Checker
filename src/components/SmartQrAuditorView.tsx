@@ -252,7 +252,7 @@ export const SmartQrAuditorView: React.FC<SmartQrAuditorViewProps> = ({
           handleCrawlLiveUrl(decoded.rawPayload);
         }
       } else {
-        setDecodeMessage('Could not decode QR code from this snapshot. Please center the QR within the illuminated reticle.');
+        setDecodeMessage('Could not decode QR code from this snapshot. Please ensure the QR code is clear, well-lit, and in focus.');
       }
     } catch (err) {
       console.warn('QR decode error:', err);
@@ -562,22 +562,6 @@ export const SmartQrAuditorView: React.FC<SmartQrAuditorViewProps> = ({
                   )}
                 </div>
               </div>
-
-              {/* QR Box Target Reticle (Center) */}
-              {!capturedImage && isCameraActive && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none p-6 z-20">
-                  <div className="relative w-56 h-56 border-2 border-dashed border-white/60 rounded-3xl flex items-center justify-center bg-white/5 backdrop-blur-[1px]">
-                    {/* Pulsing scanning radar line */}
-                    <div className="w-48 h-0.5 bg-indigo-400 shadow-[0_0_12px_#818cf8] animate-pulse" />
-
-                    {/* Corner Bracket Reticles */}
-                    <div className="absolute top-0 left-0 w-5 h-5 border-t-4 border-l-4 border-white/90 rounded-tl-xl" />
-                    <div className="absolute top-0 right-0 w-5 h-5 border-t-4 border-r-4 border-white/90 rounded-tr-xl" />
-                    <div className="absolute bottom-0 left-0 w-5 h-5 border-b-4 border-l-4 border-white/90 rounded-bl-xl" />
-                    <div className="absolute bottom-0 right-0 w-5 h-5 border-b-4 border-r-4 border-white/90 rounded-br-xl" />
-                  </div>
-                </div>
-              )}
 
               {/* Floating Zoom Controls (1x, 2x) */}
               {!capturedImage && isCameraActive && (

@@ -96,6 +96,15 @@ export interface BarcodeVerificationResult {
   complianceVerdict: 'COMPLIANT' | 'VIOLATION' | 'WARNING';
   observation: string;
   legalCitation: string;
+  mathBreakdown?: {
+    digits: number[];
+    weights: number[];
+    products: number[];
+    weightedSum: number;
+    moduloRemainder: number;
+    calculatedCheckDigit: number;
+    formulaExplanation: string;
+  };
 }
 
 export interface SmartQrVerificationResult {

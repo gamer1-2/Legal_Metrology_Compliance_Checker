@@ -18,6 +18,10 @@ import {
   ExternalLink,
   Power,
   Check,
+  Loader2,
+  ArrowDown,
+  Calculator,
+  ChevronDown,
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
@@ -60,12 +64,17 @@ export const BarcodeProvenanceView: React.FC<BarcodeProvenanceViewProps> = ({
   const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
 
   // Barcode & Provenance Data State
-  const [barcodeInput, setBarcodeInput] = useState('8901030924512');
+  const [barcodeInput, setBarcodeInput] = useState('8901030924514');
   const [declaredOrigin, setDeclaredOrigin] = useState('India');
   const [mfgDetails, setMfgDetails] = useState('Regd. Office: Mumbai, Maharashtra, India');
   const [verificationResult, setVerificationResult] = useState<BarcodeVerificationResult | null>(() =>
-    verifyBarcodeProvenance('8901030924512', 'India', 'Regd. Office: Mumbai, Maharashtra, India')
+    verifyBarcodeProvenance('8901030924514', 'India', 'Regd. Office: Mumbai, Maharashtra, India')
   );
+  const [isCheckingMath, setIsCheckingMath] = useState(false);
+  const [decodeNotice, setDecodeNotice] = useState<{
+    type: 'success' | 'error' | 'warning';
+    message: string;
+  } | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -239,29 +248,97 @@ export const BarcodeProvenanceView: React.FC<BarcodeProvenanceViewProps> = ({
   // Process image data (from live snapshot or file upload)
   const processImageData = async (dataUrl: string) => {
     setIsAnalyzingImage(true);
+    setDecodeNotice(null);
     try {
       const decoded = await decodeBarcodeFromCanvasOrImage(dataUrl);
       if (decoded && decoded.text) {
-        setBarcodeInput(decoded.text);
-        const res = verifyBarcodeProvenance(decoded.text, declaredOrigin, mfgDetails);
+        const cleanDigits = decoded.text.replace(/\D/g, '');
+        setBarcodeInput(cleanDigits);
+
+        const activeOrigin = decoded.declaredOrigin || declaredOrigin;
+        const activeMfg = decoded.manufacturerDetails || mfgDetails;
+
+        if (decoded.declaredOrigin && !declaredOrigin) {
+          setDeclaredOrigin(decoded.declaredOrigin);
+        }
+        if (decoded.manufacturerDetails && !mfgDetails) {
+          setMfgDetails(decoded.manufacturerDetails);
+        }
+
+        const res = verifyBarcodeProvenance(cleanDigits, activeOrigin, activeMfg);
         setVerificationResult(res);
+
+        const methodLabel =
+          decoded.source === 'AI_VISION_SERVER'
+            ? 'via AI Vision OCR'
+            : decoded.source === 'NATIVE_BARCODE_DETECTOR'
+            ? 'via Hardware Detector'
+            : 'via Optical Reader';
+
+        setDecodeNotice({
+          type: res.isCheckDigitValid ? 'success' : 'warning',
+          message: `Decoded ${decoded.format || 'EAN-13'} Barcode: ${cleanDigits} (${methodLabel}). Modulo-10 check is ${
+            res.isCheckDigitValid ? 'VALID' : 'INVALID'
+          }.`,
+        });
+
+        // Smooth scroll to results on mobile devices
+        if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+          setTimeout(() => {
+            document.getElementById('barcode-audit-report')?.scrollIntoView({ behavior: 'smooth' });
+          }, 350);
+        }
       } else {
-        // Fallback: If optical decoder didn't find clear contrast, still run verification on current numbers
-        const res = verifyBarcodeProvenance(barcodeInput, declaredOrigin, mfgDetails);
-        setVerificationResult(res);
+        setDecodeNotice({
+          type: 'error',
+          message:
+            'Could not detect barcode bars in this photograph. Please ensure good lighting and clear focus, or enter the printed barcode digits manually below.',
+        });
       }
     } catch (err) {
       console.warn('Barcode decoding error:', err);
+      setDecodeNotice({
+        type: 'error',
+        message: 'Optical reading encountered an issue. Please enter the barcode digits manually below.',
+      });
     } finally {
       setIsAnalyzingImage(false);
     }
   };
 
-  // Manual verify trigger
+  // Manual verify trigger with real working math feedback
   const handleManualVerify = (customCode?: string) => {
-    const code = customCode || barcodeInput;
-    const res = verifyBarcodeProvenance(code, declaredOrigin, mfgDetails);
+    const raw = (customCode !== undefined ? customCode : barcodeInput) || '';
+    const cleanDigits = raw.replace(/\D/g, '');
+
+    if (!cleanDigits) {
+      setDecodeNotice({
+        type: 'warning',
+        message: 'Please enter at least 8 barcode digits (e.g. 13-digit EAN-13 or 12-digit UPC-A) to run the mathematical Modulo-10 check.',
+      });
+      return;
+    }
+
+    setIsCheckingMath(true);
+    setBarcodeInput(cleanDigits);
+
+    const res = verifyBarcodeProvenance(cleanDigits, declaredOrigin, mfgDetails);
     setVerificationResult(res);
+
+    setTimeout(() => {
+      setIsCheckingMath(false);
+      if (res.isCheckDigitValid) {
+        setDecodeNotice({
+          type: 'success',
+          message: `✓ Checksum Valid: Check digit (${res.actualCheckDigit}) matches calculated Modulo-10 (${res.calculatedCheckDigit}). Country: ${res.countryOfIssuance}.`,
+        });
+      } else {
+        setDecodeNotice({
+          type: 'error',
+          message: `✗ Checksum Mismatch: Barcode ends with ${res.actualCheckDigit}, but Modulo-10 formula computed ${res.calculatedCheckDigit}! Damaged or invalid GTIN.`,
+        });
+      }
+    }, 250);
   };
 
   // Apply quick test preset
@@ -287,7 +364,7 @@ export const BarcodeProvenanceView: React.FC<BarcodeProvenanceViewProps> = ({
   }, []);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full max-w-full min-w-0">
       {onBack && onSelectTool && (
         <ToolHeader
           currentTool="barcode"
@@ -360,9 +437,9 @@ export const BarcodeProvenanceView: React.FC<BarcodeProvenanceViewProps> = ({
       </div>
 
       {/* Main Two-Column Layout */}
-      <div className="grid gap-6 lg:grid-cols-12">
+      <div className="grid gap-6 lg:grid-cols-12 w-full max-w-full min-w-0">
         {/* Left Column: Real-Time Scanning Camera Viewfinder & Mode Switcher */}
-        <div className="space-y-4 lg:col-span-6">
+        <div className="space-y-4 lg:col-span-6 w-full max-w-full min-w-0">
           {/* Mode Switcher Tabs */}
           <div className="bg-white rounded-2xl border border-slate-200 p-1.5 shadow-2xs">
             <div className="grid grid-cols-2 gap-1.5">
@@ -420,7 +497,7 @@ export const BarcodeProvenanceView: React.FC<BarcodeProvenanceViewProps> = ({
               {capturedImage ? (
                 <img
                   src={capturedImage}
-                  alt="Captured Barcode"
+                  alt="Captured Barcode Snapshot"
                   className="absolute inset-0 w-full h-full object-contain bg-black z-10"
                 />
               ) : (
@@ -444,7 +521,7 @@ export const BarcodeProvenanceView: React.FC<BarcodeProvenanceViewProps> = ({
                   <div className="space-y-1">
                     <p className="text-sm font-bold text-white">Tap to Open Scanner Camera</p>
                     <p className="text-xs text-neutral-400 max-w-xs">
-                      Position physical 1D barcode on product packaging across the laser beam
+                      Center the packaging barcode or GTIN label inside the lens
                     </p>
                   </div>
                   <button
@@ -453,7 +530,7 @@ export const BarcodeProvenanceView: React.FC<BarcodeProvenanceViewProps> = ({
                       e.stopPropagation();
                       startCamera(cameraFacing);
                     }}
-                    className="mt-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-full text-xs font-bold shadow-lg shadow-blue-900/40 transition-all cursor-pointer pointer-events-auto"
+                    className="mt-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full text-xs font-bold shadow-lg shadow-indigo-900/40 transition-all cursor-pointer pointer-events-auto"
                   >
                     Start Camera Viewfinder
                   </button>
@@ -469,9 +546,9 @@ export const BarcodeProvenanceView: React.FC<BarcodeProvenanceViewProps> = ({
               <div className="absolute top-3.5 inset-x-3.5 z-30 flex items-center justify-between pointer-events-none">
                 {/* Left: Active Aiming Target Badge */}
                 <div className="pointer-events-auto bg-black/60 backdrop-blur-md px-3.5 py-1.5 rounded-full text-white/90 text-xs font-medium flex items-center gap-2 border border-white/15 shadow-sm">
-                  <span className={`w-2 h-2 rounded-full ${capturedImage ? 'bg-blue-400' : 'bg-red-500 animate-pulse'}`} />
+                  <span className={`w-2 h-2 rounded-full ${capturedImage ? 'bg-indigo-400' : 'bg-indigo-500 animate-pulse'}`} />
                   <span className="font-semibold">
-                    {capturedImage ? 'Captured Snapshot' : 'Barcode Laser Alignment'}
+                    {capturedImage ? 'Captured Barcode Snapshot' : 'Barcode & Origin Scanner'}
                   </span>
                 </div>
 
@@ -523,22 +600,6 @@ export const BarcodeProvenanceView: React.FC<BarcodeProvenanceViewProps> = ({
                 </div>
               </div>
 
-              {/* Barcode Aiming Laser Reticle (Center) */}
-              {!capturedImage && isCameraActive && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none p-6 z-20">
-                  <div className="relative w-5/6 h-36 border-2 border-dashed border-white/60 rounded-2xl flex items-center justify-center bg-white/5 backdrop-blur-[1px]">
-                    {/* Laser scanning line */}
-                    <div className="w-full h-0.5 bg-red-500 shadow-[0_0_12px_#ef4444] animate-pulse" />
-
-                    {/* 4 Corner brackets */}
-                    <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-white/90 rounded-tl-lg" />
-                    <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-white/90 rounded-tr-lg" />
-                    <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-white/90 rounded-bl-lg" />
-                    <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-white/90 rounded-br-lg" />
-                  </div>
-                </div>
-              )}
-
               {/* Floating Zoom Controls (1x, 2x) */}
               {!capturedImage && isCameraActive && (
                 <div className="absolute bottom-24 inset-x-0 flex justify-center z-30 pointer-events-none">
@@ -565,10 +626,27 @@ export const BarcodeProvenanceView: React.FC<BarcodeProvenanceViewProps> = ({
               {/* Analyzing / Decoding Overlay */}
               {isAnalyzingImage && (
                 <div className="absolute inset-0 bg-black/75 backdrop-blur-xs flex flex-col items-center justify-center gap-3 z-40">
-                  <RefreshCw className="h-8 w-8 animate-spin text-blue-400" />
+                  <RefreshCw className="h-8 w-8 animate-spin text-indigo-400" />
                   <span className="text-xs font-bold text-white tracking-wide">
                     Decoding GS1 Modulo-10 Barcode...
                   </span>
+                </div>
+              )}
+
+              {/* Decode Notice Overlay inside viewfinder */}
+              {decodeNotice && (
+                <div className="absolute top-16 inset-x-4 z-40 flex justify-center pointer-events-none">
+                  <div
+                    className={`text-xs px-3.5 py-2 rounded-xl shadow-lg backdrop-blur-md max-w-sm text-center border ${
+                      decodeNotice.type === 'success'
+                        ? 'bg-emerald-950/90 border-emerald-800 text-emerald-200'
+                        : decodeNotice.type === 'error'
+                        ? 'bg-rose-950/90 border-rose-800 text-rose-200'
+                        : 'bg-amber-950/90 border-amber-800 text-amber-200'
+                    }`}
+                  >
+                    {decodeNotice.message}
+                  </div>
                 </div>
               )}
 
@@ -588,7 +666,7 @@ export const BarcodeProvenanceView: React.FC<BarcodeProvenanceViewProps> = ({
                       }}
                       className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-xs font-black text-slate-900 shadow-xl hover:bg-slate-100 transition-all active:scale-95 cursor-pointer"
                     >
-                      <RotateCcw className="w-4 h-4 text-blue-600" />
+                      <RotateCcw className="w-4 h-4 text-indigo-600" />
                       Retake Photo
                     </button>
                   ) : (
@@ -604,7 +682,7 @@ export const BarcodeProvenanceView: React.FC<BarcodeProvenanceViewProps> = ({
                         }
                       }}
                       className="w-16 h-16 rounded-full border-4 border-white p-1 flex items-center justify-center transition-transform hover:scale-105 active:scale-90 cursor-pointer shadow-lg shadow-black/60"
-                      title={isCameraActive ? 'Capture Picture & Verify' : 'Start Camera'}
+                      title={isCameraActive ? 'Capture Picture & Verify Barcode' : 'Start Camera'}
                     >
                       <div className="w-full h-full rounded-full bg-white transition-opacity active:opacity-80" />
                     </button>
@@ -649,11 +727,22 @@ export const BarcodeProvenanceView: React.FC<BarcodeProvenanceViewProps> = ({
                 </div>
                 <button
                   type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    fileInputRef.current?.click();
+                  }}
                   className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer"
                 >
                   Select File from Device
                 </button>
               </div>
+
+              {isAnalyzingImage && (
+                <div className="flex items-center justify-center gap-2.5 p-3.5 bg-blue-50 border border-blue-200 rounded-xl text-xs font-semibold text-blue-800 animate-pulse">
+                  <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                  <span>Scanning photograph with multi-resolution optical reader &amp; AI Vision...</span>
+                </div>
+              )}
             </div>
           )}
 
@@ -666,24 +755,149 @@ export const BarcodeProvenanceView: React.FC<BarcodeProvenanceViewProps> = ({
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="block font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                  Barcode Number (EAN-13 / GTIN)
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block font-semibold uppercase tracking-wider text-slate-600">
+                    Barcode Number (EAN-13 / GTIN)
+                  </label>
+                  <span className="text-[11px] font-mono text-slate-400">
+                    {barcodeInput.replace(/\D/g, '').length} digits
+                    {barcodeInput.replace(/\D/g, '').length === 13
+                      ? ' (EAN-13)'
+                      : barcodeInput.replace(/\D/g, '').length === 12
+                      ? ' (UPC-A)'
+                      : barcodeInput.replace(/\D/g, '').length === 8
+                      ? ' (EAN-8)'
+                      : ''}
+                  </span>
+                </div>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={barcodeInput}
                     onChange={(e) => setBarcodeInput(e.target.value)}
-                    placeholder="e.g. 8901030924512"
+                    placeholder="e.g. 8901030924514"
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-mono text-slate-900 focus:border-blue-500 focus:outline-none"
                   />
                   <button
                     onClick={() => handleManualVerify()}
-                    className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 transition-colors shrink-0"
+                    disabled={isCheckingMath}
+                    className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 active:scale-95 transition-all shrink-0 flex items-center gap-1.5 shadow-sm shadow-blue-500/20 disabled:opacity-75 cursor-pointer"
+                    title="Calculate GS1 Modulo-10 checksum and check issuing country"
                   >
-                    Run Math Check
+                    {isCheckingMath ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Checking...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Calculator className="w-3.5 h-3.5" />
+                        <span>Run Math Check</span>
+                      </>
+                    )}
                   </button>
                 </div>
+
+                {/* Decode or Verification Feedback Notice */}
+                {decodeNotice && (
+                  <div
+                    className={`mt-2 flex items-start justify-between gap-2 rounded-lg p-2.5 text-xs font-medium border ${
+                      decodeNotice.type === 'success'
+                        ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                        : decodeNotice.type === 'error'
+                        ? 'border-rose-200 bg-rose-50 text-rose-900'
+                        : 'border-amber-200 bg-amber-50 text-amber-900'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      {decodeNotice.type === 'success' ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      ) : decodeNotice.type === 'error' ? (
+                        <XCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                      ) : (
+                        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                      )}
+                      <span>{decodeNotice.message}</span>
+                    </div>
+                    <button
+                      onClick={() => setDecodeNotice(null)}
+                      className="text-slate-400 hover:text-slate-600 text-sm font-bold px-1"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+
+                {/* Instant Inline Math Check Verification Card */}
+                {verificationResult && (
+                  <div className="mt-2.5 rounded-xl border border-slate-200 bg-slate-50/80 p-3 text-xs space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-700 flex items-center gap-1.5">
+                        <Scale className="w-3.5 h-3.5 text-blue-600" />
+                        GS1 Modulo-10 Result:
+                      </span>
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold text-[11px] ${
+                          verificationResult.isCheckDigitValid
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-rose-100 text-rose-800'
+                        }`}
+                      >
+                        {verificationResult.isCheckDigitValid ? (
+                          <>
+                            <CheckCircle2 className="w-3 h-3" />
+                            Valid Check Digit ({verificationResult.actualCheckDigit})
+                          </>
+                        ) : (
+                          <>
+                            <XCircle className="w-3 h-3" />
+                            Mismatch (Expected {verificationResult.calculatedCheckDigit}, Got {verificationResult.actualCheckDigit})
+                          </>
+                        )}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[11px] bg-white p-2 rounded-lg border border-slate-200">
+                      <div>
+                        <span className="text-slate-500 block">GS1 Prefix:</span>
+                        <strong className="text-slate-900 font-mono">
+                          {verificationResult.prefix || 'N/A'} ({verificationResult.countryOfIssuance})
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block">Provenance:</span>
+                        <strong
+                          className={
+                            verificationResult.provenanceMatchStatus === 'VERIFIED_MATCH'
+                              ? 'text-emerald-700'
+                              : verificationResult.provenanceMatchStatus === 'SUSPECTED_MISMATCH'
+                              ? 'text-rose-700'
+                              : 'text-amber-700'
+                          }
+                        >
+                          {verificationResult.provenanceMatchStatus === 'VERIFIED_MATCH'
+                            ? '✓ Origin Matched'
+                            : verificationResult.provenanceMatchStatus === 'SUSPECTED_MISMATCH'
+                            ? '✗ Discrepancy'
+                            : 'Licensee / Import'}
+                        </strong>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end pt-0.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          document.getElementById('barcode-audit-report')?.scrollIntoView({ behavior: 'smooth' });
+                        }}
+                        className="text-blue-600 hover:text-blue-800 font-semibold text-[11px] flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>View Step-by-Step Math Matrix</span>
+                        <ArrowDown className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -723,32 +937,35 @@ export const BarcodeProvenanceView: React.FC<BarcodeProvenanceViewProps> = ({
               </span>
               <div className="flex flex-wrap gap-1.5">
                 <button
+                  type="button"
                   onClick={() => {
-                    setBarcodeInput('8901030924512');
+                    setBarcodeInput('8901030924514');
                     setDeclaredOrigin('India');
-                    handleManualVerify('8901030924512');
+                    handleManualVerify('8901030924514');
                   }}
-                  className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
+                  className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-100 cursor-pointer"
                 >
                   🇮🇳 Valid India (890)
                 </button>
                 <button
+                  type="button"
                   onClick={() => {
-                    setBarcodeInput('6921234567894');
+                    setBarcodeInput('6921234567890');
                     setDeclaredOrigin('India');
-                    handleManualVerify('6921234567894');
+                    handleManualVerify('6921234567890');
                   }}
-                  className="rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-700 hover:bg-rose-100"
+                  className="rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-700 hover:bg-rose-100 cursor-pointer"
                 >
                   🚨 Mismatch (692 vs India)
                 </button>
                 <button
+                  type="button"
                   onClick={() => {
-                    setBarcodeInput('8901234567899'); // Invalid check digit
+                    setBarcodeInput('8901030924519'); // Invalid check digit 9 instead of 4
                     setDeclaredOrigin('India');
-                    handleManualVerify('8901234567899');
+                    handleManualVerify('8901030924519');
                   }}
-                  className="rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-700 hover:bg-amber-100"
+                  className="rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-700 hover:bg-amber-100 cursor-pointer"
                 >
                   ⚠️ Checksum Failure
                 </button>
@@ -758,7 +975,7 @@ export const BarcodeProvenanceView: React.FC<BarcodeProvenanceViewProps> = ({
         </div>
 
         {/* Right Column: Verification Results & GS1 Audit Report */}
-        <div className="space-y-4 lg:col-span-6">
+        <div id="barcode-audit-report" className="space-y-4 lg:col-span-6 scroll-mt-6 w-full max-w-full min-w-0">
           {verificationResult ? (
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
               {/* Verdict Banner */}
@@ -832,7 +1049,8 @@ export const BarcodeProvenanceView: React.FC<BarcodeProvenanceViewProps> = ({
               {/* Modulo-10 Check Digit Math Card */}
               <div className="rounded-xl border border-slate-200 bg-white p-4.5 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <Calculator className="w-3.5 h-3.5 text-blue-600" />
                     GS1 Modulo-10 Checksum Verification
                   </span>
                   <span
@@ -852,7 +1070,7 @@ export const BarcodeProvenanceView: React.FC<BarcodeProvenanceViewProps> = ({
                   </span>
                 </div>
 
-                <div className="rounded-lg bg-slate-50 p-3.5 font-mono text-xs space-y-2 border border-slate-100">
+                <div className="rounded-lg bg-slate-50 p-3.5 font-mono text-xs space-y-2.5 border border-slate-100">
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500">Calculated Modulo-10 Check Digit:</span>
                     <strong className="text-sm font-bold text-slate-900">
@@ -869,8 +1087,73 @@ export const BarcodeProvenanceView: React.FC<BarcodeProvenanceViewProps> = ({
                       {verificationResult.actualCheckDigit}
                     </strong>
                   </div>
-                  <p className="text-[11px] text-slate-500 pt-1 border-t border-slate-200">
-                    Computed via alternating 3x and 1x positional weights modulo 10. A mismatch indicates an altered or counterfeit barcode plate.
+
+                  {/* Step-by-Step Mathematical Weighting Matrix */}
+                  {verificationResult.mathBreakdown && (
+                    <div className="pt-2 border-t border-slate-200 space-y-2">
+                      <span className="text-[11px] font-sans font-bold text-slate-700 block">
+                        Positional Weighting Breakdown (GS1 Standard):
+                      </span>
+                      <div className="w-full max-w-full overflow-x-auto pb-1 min-w-0">
+                        <table className="w-full text-center text-[10px] border-collapse min-w-0">
+                          <thead>
+                            <tr className="bg-slate-200/70 text-slate-600">
+                              <th className="py-1 px-1 text-left font-sans">Row</th>
+                              {verificationResult.mathBreakdown.digits.map((_, idx) => (
+                                <th key={idx} className="py-1 px-1 font-mono">
+                                  d{idx + 1}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr className="border-b border-slate-200 text-slate-800">
+                              <td className="py-1 px-1 text-left font-sans font-semibold text-slate-500">Digit</td>
+                              {verificationResult.mathBreakdown.digits.map((d, idx) => (
+                                <td key={idx} className="py-1 px-1 font-bold">
+                                  {d}
+                                </td>
+                              ))}
+                            </tr>
+                            <tr className="border-b border-slate-200 text-slate-500">
+                              <td className="py-1 px-1 text-left font-sans font-medium">Weight</td>
+                              {verificationResult.mathBreakdown.weights.map((w, idx) => (
+                                <td key={idx} className="py-1 px-1 text-blue-600 font-semibold">
+                                  ×{w}
+                                </td>
+                              ))}
+                            </tr>
+                            <tr className="bg-blue-50/60 font-bold text-blue-950">
+                              <td className="py-1 px-1 text-left font-sans text-blue-800">Product</td>
+                              {verificationResult.mathBreakdown.products.map((p, idx) => (
+                                <td key={idx} className="py-1 px-1">
+                                  {p}
+                                </td>
+                              ))}
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <div className="rounded-md bg-white p-2.5 border border-slate-200 text-[11px] space-y-1 font-mono text-slate-700">
+                        <div className="flex justify-between">
+                          <span>Weighted Sum (Σ Products):</span>
+                          <strong>{verificationResult.mathBreakdown.weightedSum}</strong>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Modulo 10 Remainder:</span>
+                          <span>{verificationResult.mathBreakdown.weightedSum} % 10 = <strong>{verificationResult.mathBreakdown.moduloRemainder}</strong></span>
+                        </div>
+                        <div className="flex justify-between text-slate-900 font-bold">
+                          <span>Check Digit Formula:</span>
+                          <span>(10 - {verificationResult.mathBreakdown.moduloRemainder}) % 10 = <strong>{verificationResult.mathBreakdown.calculatedCheckDigit}</strong></span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <p className="text-[11px] font-sans text-slate-500 pt-1 border-t border-slate-200">
+                    Computed via alternating 3x and 1x positional weights modulo 10 according to GS1 General Specifications. A check digit mismatch indicates an invalid, counterfeit, or misprinted barcode.
                   </p>
                 </div>
               </div>

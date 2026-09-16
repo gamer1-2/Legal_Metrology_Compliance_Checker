@@ -212,7 +212,7 @@ export default function App() {
         </header>
 
         {/* Dynamic Page Views */}
-        <main className="flex-1 overflow-y-auto pb-20 md:pb-6 no-scrollbar">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden pb-20 md:pb-6 no-scrollbar">
           {activePage === 'scan' && (
             <ScannerView
               onScanComplete={handleScanComplete}
@@ -324,7 +324,7 @@ export default function App() {
           )}
 
           {activePage === 'barcode' && (
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full min-w-0">
               <BarcodeProvenanceView
                 onBack={() => setActivePage('tools')}
                 onSelectTool={(tool) => setActivePage(tool)}
@@ -333,7 +333,7 @@ export default function App() {
           )}
 
           {activePage === 'qr' && (
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full min-w-0">
               <SmartQrAuditorView
                 onBack={() => setActivePage('tools')}
                 onSelectTool={(tool) => setActivePage(tool)}
@@ -364,17 +364,20 @@ export default function App() {
 
         {/* Mobile Bottom Navigation Bar (Thumb-friendly field inspector layout) */}
         <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200 px-2 py-1.5 flex items-center justify-around select-none shadow-lg print:hidden">
-          {/* Scan */}
+          {/* Visual Studio */}
           <button
-            onClick={() => setActivePage('scan')}
+            onClick={() => {
+              if (currentReport) setActivePage('studio');
+              else setActivePage('scan');
+            }}
             className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl min-w-[54px] min-h-[44px] transition-colors cursor-pointer ${
-              activePage === 'scan' ? 'text-emerald-700 font-bold' : 'text-slate-500 hover:text-slate-800'
+              activePage === 'studio' ? 'text-emerald-700 font-bold' : 'text-slate-500 hover:text-slate-800'
             }`}
           >
-            <div className={`p-1 rounded-lg ${activePage === 'scan' ? 'bg-emerald-100 text-emerald-700' : ''}`}>
-              <Camera className="w-5 h-5" />
+            <div className={`p-1 rounded-lg ${activePage === 'studio' ? 'bg-emerald-100 text-emerald-700' : ''}`}>
+              <Layers className="w-5 h-5" />
             </div>
-            <span className="text-[10px] mt-0.5">Scan</span>
+            <span className="text-[10px] mt-0.5">Studio</span>
           </button>
 
           {/* Report */}
@@ -396,20 +399,17 @@ export default function App() {
             )}
           </button>
 
-          {/* Visual Studio */}
+          {/* Scan */}
           <button
-            onClick={() => {
-              if (currentReport) setActivePage('studio');
-              else setActivePage('scan');
-            }}
+            onClick={() => setActivePage('scan')}
             className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl min-w-[54px] min-h-[44px] transition-colors cursor-pointer ${
-              activePage === 'studio' ? 'text-emerald-700 font-bold' : 'text-slate-500 hover:text-slate-800'
+              activePage === 'scan' ? 'text-emerald-700 font-bold' : 'text-slate-500 hover:text-slate-800'
             }`}
           >
-            <div className={`p-1 rounded-lg ${activePage === 'studio' ? 'bg-emerald-100 text-emerald-700' : ''}`}>
-              <Layers className="w-5 h-5" />
+            <div className={`p-1 rounded-lg ${activePage === 'scan' ? 'bg-emerald-100 text-emerald-700' : ''}`}>
+              <Camera className="w-5 h-5" />
             </div>
-            <span className="text-[10px] mt-0.5">Studio</span>
+            <span className="text-[10px] mt-0.5">Scan</span>
           </button>
 
           {/* History */}

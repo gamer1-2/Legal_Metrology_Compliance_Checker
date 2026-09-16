@@ -364,43 +364,93 @@ Return a valid JSON object matching the exact structure below:
   parts.push({ text: prompt });
 
   // Priority candidate models:
-  // 1. gemini-flash-latest: high availability, fast multimodal vision
-  // 2. gemini-3.1-flash-lite: fast, responsive fallback
-  // 3. gemini-3.8-flash: premium vision model
-  const candidateModels = ['gemini-flash-latest', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
+  // 1. gemini-3-flash-preview: resilient, high-speed vision model
+  // 2. gemini-flash-lite-latest: ultra-fast lightweight multimodal model
+  // 3. gemini-3.6-flash: stable high-capacity vision model
+  // 4. gemini-3.8-flash: comprehensive multimodal analysis model
+  // 5. gemini-3.1-flash-lite: fast fallback
+  // 6. gemini-flash-latest: high availability fallback
+  const candidateModels = [
+    'gemini-3-flash-preview',
+    'gemini-flash-lite-latest',
+    'gemini-3.6-flash',
+    'gemini-3.8-flash',
+    'gemini-3.1-flash-lite',
+    'gemini-flash-latest',
+  ];
   let lastError: any = null;
   let responseText = '';
   let successfulModel = '';
 
   for (const modelName of candidateModels) {
-    try {
-      console.log(`Attempting LMPC label compliance vision analysis with model: ${modelName}...`);
-      const response = await ai.models.generateContent({
-        model: modelName,
-        contents: { parts },
-        config: {
-          systemInstruction,
-          responseMimeType: 'application/json',
-          temperature: 0.1,
-        },
-      });
+    let modelSucceeded = false;
+    // Try up to 2 attempts per model with backoff on transient 503/429 spikes
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        console.log(`Attempting LMPC label compliance vision analysis with model: ${modelName} (attempt ${attempt + 1})...`);
+        const response = await ai.models.generateContent({
+          model: modelName,
+          contents: { parts },
+          config: {
+            systemInstruction,
+            responseMimeType: 'application/json',
+            temperature: 0.1,
+          },
+        });
 
-      if (response && response.text) {
-        responseText = response.text;
-        successfulModel = modelName;
-        console.log(`Successfully completed LMPC label analysis with model: ${modelName}`);
+        if (response && response.text) {
+          responseText = response.text;
+          successfulModel = modelName;
+          console.log(`Successfully completed LMPC label analysis with model: ${modelName}`);
+          modelSucceeded = true;
+          break;
+        }
+      } catch (err: any) {
+        lastError = err;
+        const errMsg = String(err?.message || '');
+        const isTransient =
+          errMsg.includes('503') ||
+          errMsg.includes('429') ||
+          errMsg.includes('high demand') ||
+          errMsg.includes('UNAVAILABLE') ||
+          errMsg.includes('RESOURCE_EXHAUSTED') ||
+          err?.status === 503 ||
+          err?.status === 429;
+
+        console.warn(`Model ${modelName} encountered error: ${errMsg.slice(0, 200)}`);
+
+        if (isTransient && attempt === 0) {
+          const backoffDelay = 800 + Math.floor(Math.random() * 400);
+          console.log(`Retrying ${modelName} in ${backoffDelay}ms after transient demand spike...`);
+          await new Promise((resolve) => setTimeout(resolve, backoffDelay));
+          continue;
+        }
+        // Proceed to next candidate model
         break;
       }
-    } catch (err: any) {
-      console.warn(`Model ${modelName} encountered error: ${err?.message?.slice(0, 200)}`);
-      lastError = err;
-      // Continue to next candidate model
+    }
+
+    if (modelSucceeded) {
+      break;
     }
   }
 
   if (!responseText) {
+    const errMsg = lastError?.message || '';
+    const isTransientSpike =
+      errMsg.includes('503') ||
+      errMsg.includes('high demand') ||
+      errMsg.includes('UNAVAILABLE') ||
+      errMsg.includes('RESOURCE_EXHAUSTED');
+
+    if (isTransientSpike) {
+      throw new Error(
+        'Google Gemini AI Vision is experiencing temporary high demand spikes. Please tap "Retry Scan" in a few seconds.'
+      );
+    }
+
     throw new Error(
-      `AI Vision Extraction Error: All candidate models failed. Last error: ${lastError?.message || 'High server demand or network error'}`
+      `AI Vision Extraction Error: All candidate models failed. Last error: ${errMsg || 'High server demand or network error'}`
     );
   }
 
@@ -550,5 +600,108 @@ Return a valid JSON object matching the exact structure below:
 
   return inspectionResult;
 }
+
+export async function decodeBarcodeWithGemini(imageBase64: string): Promise<{
+  detected: boolean;
+  barcode?: string;
+  symbology?: string;
+  declaredOrigin?: string;
+  manufacturerDetails?: string;
+  observation?: string;
+}> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return { detected: false, observation: 'GEMINI_API_KEY is not configured on the server.' };
+  }
+
+  const ai = new GoogleGenAI({
+    apiKey,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
+      },
+    },
+  });
+
+  const mimeType = getMimeType(imageBase64, 'image/jpeg');
+  const cleanBase64 = stripBase64Prefix(imageBase64);
+
+  const prompt = `Examine this packaging or barcode photograph carefully.
+1. Locate the 1D printed retail barcode (EAN-13, UPC-A, EAN-8, or Code-128).
+2. Read the exact barcode digits printed directly underneath or alongside the bars (e.g. 13 digits for EAN-13, 12 digits for UPC-A, or 8 digits for EAN-8).
+3. If visible, extract the declared Country of Origin (e.g. "Made in India", "Country of Origin: India", "Made in China", etc.) and the Manufacturer or Importer address.
+
+Return ONLY a JSON object with this exact structure:
+{
+  "detected": true or false,
+  "barcode": "string of digits only, e.g. 8901030924512",
+  "symbology": "EAN_13" | "UPC_A" | "EAN_8" | "CODE_128" | "UNKNOWN",
+  "declaredOrigin": "string (or null if not found)",
+  "manufacturerDetails": "string (or null if not found)",
+  "observation": "short description of what was read"
+}`;
+
+  try {
+    const candidateModels = [
+      'gemini-3-flash-preview',
+      'gemini-flash-lite-latest',
+      'gemini-3.6-flash',
+      'gemini-3.8-flash',
+      'gemini-3.1-flash-lite',
+      'gemini-flash-latest',
+    ];
+    for (const model of candidateModels) {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const response = await ai.models.generateContent({
+            model,
+            contents: {
+              parts: [
+                { inlineData: { data: cleanBase64, mimeType } },
+                { text: prompt },
+              ],
+            },
+            config: {
+              responseMimeType: 'application/json',
+              temperature: 0.1,
+            },
+          });
+
+          const text = response.text ? response.text.trim() : '';
+          if (text) {
+            const parsed = JSON.parse(text);
+            if (parsed && parsed.detected && parsed.barcode) {
+              const cleanDigits = String(parsed.barcode).replace(/\D/g, '');
+              if (cleanDigits.length >= 8) {
+                return {
+                  detected: true,
+                  barcode: cleanDigits,
+                  symbology: parsed.symbology || (cleanDigits.length === 13 ? 'EAN_13' : cleanDigits.length === 12 ? 'UPC_A' : 'EAN_8'),
+                  declaredOrigin: parsed.declaredOrigin || undefined,
+                  manufacturerDetails: parsed.manufacturerDetails || undefined,
+                  observation: parsed.observation || `Decoded barcode ${cleanDigits} via AI Vision.`,
+                };
+              }
+            }
+          }
+          break; // Model answered (even if barcode not detected in image)
+        } catch (e: any) {
+          console.warn(`decodeBarcodeWithGemini error on ${model}:`, e?.message?.slice(0, 150));
+          const isTransient = String(e?.message || '').includes('503') || String(e?.message || '').includes('429');
+          if (isTransient && attempt === 0) {
+            await new Promise((r) => setTimeout(r, 600));
+            continue;
+          }
+          break;
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Gemini barcode decoding error:', err);
+  }
+
+  return { detected: false, observation: 'No barcode could be identified from this image.' };
+}
+
 
 

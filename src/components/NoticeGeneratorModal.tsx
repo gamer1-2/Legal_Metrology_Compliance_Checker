@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { exportToPdf } from '../utils/pdfExport';
 import { X, Printer, Copy, Check, FileCheck, AlertOctagon, Scale, Share2, CheckCircle2 } from 'lucide-react';
 import { InspectionResult } from '../types/compliance';
 import { exportOrShareFile } from '../utils/fileExport';
@@ -20,6 +21,8 @@ export const NoticeGeneratorModal: React.FC<NoticeGeneratorModalProps> = ({
   const [deadlineDays, setDeadlineDays] = useState(15);
   const [copied, setCopied] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const componentRef = useRef<HTMLDivElement>(null);
 
   if (!isOpen) return null;
 
@@ -134,7 +137,13 @@ Jurisdiction: ${report.inspectorInfo.jurisdiction}
   };
 
   const handlePrint = () => {
-    window.print();
+    if (componentRef.current) {
+      exportToPdf(
+        componentRef.current,
+        `Notice_${noticeRef.replace(/\//g, '_')}.pdf`,
+        setIsExporting
+      );
+    }
   };
 
   return (
@@ -206,16 +215,17 @@ Jurisdiction: ${report.inspectorInfo.jurisdiction}
             </button>
             <button
               onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-colors shadow-sm cursor-pointer"
+              disabled={isExporting}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-colors shadow-sm cursor-pointer disabled:opacity-60"
             >
               <Printer className="w-4 h-4" />
-              <span>Print Official</span>
+              <span>{isExporting ? 'Generating PDF...' : 'Download PDF'}</span>
             </button>
           </div>
         </div>
 
         {/* Official Legal Document Preview (Printable) */}
-        <div className="p-8 overflow-y-auto font-serif text-slate-900 leading-relaxed text-sm bg-white space-y-6">
+        <div ref={componentRef} className="p-8 overflow-y-auto font-serif text-slate-900 leading-relaxed text-sm bg-white space-y-6">
           <div className="text-center border-b pb-4 border-slate-300 space-y-1">
             <h4 className="text-sm font-bold tracking-wider uppercase text-slate-900 font-sans">
               Government of India • Department of Consumer Affairs

@@ -39,6 +39,7 @@ import {
   getStoredBackendUrl,
   getApiBaseUrl,
 } from '../services/complianceEngine';
+import { optimizeImageForOcr } from '../utils/imageOptimizer';
 
 interface ScannerViewProps {
   onScanComplete: (result: InspectionResult) => void;
@@ -111,7 +112,9 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
   const takeNativePhoto = async () => {
     try {
       const photo = await CapCamera.getPhoto({
-        quality: 92,
+        quality: 85,
+        width: 1600,
+        height: 1600,
         allowEditing: false,
         resultType: CameraResultType.DataUrl,
         source: CameraSource.Camera,
@@ -121,21 +124,24 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
         setIsFlashing(true);
         setTimeout(() => setIsFlashing(false), 140);
 
+        // Pre-optimize the photo immediately so UI state and memory remain lean
+        const optimizedPhotoUrl = await optimizeImageForOcr(photo.dataUrl, 1600, 0.85);
+
         if (activeSlot === 'pdp') {
-          setFrontImage(photo.dataUrl);
+          setFrontImage(optimizedPhotoUrl);
           setCaptureNotice('Front Label captured! Moving to Back Panel.');
           setActiveSlot('back');
           setDocketNumber(generateInspectionReferenceId());
         } else if (activeSlot === 'back') {
-          setBackImage(photo.dataUrl);
+          setBackImage(optimizedPhotoUrl);
           setCaptureNotice('Back Panel captured! Moving to Side / Flap Panel.');
           setActiveSlot('side');
         } else if (activeSlot === 'side') {
-          setSideImage(photo.dataUrl);
+          setSideImage(optimizedPhotoUrl);
           setCaptureNotice('Side Panel captured! Moving to Close-Up Detail.');
           setActiveSlot('macro');
         } else {
-          setMacroImage(photo.dataUrl);
+          setMacroImage(optimizedPhotoUrl);
           setCaptureNotice('Close-Up Detail captured! All slots ready.');
         }
         setTimeout(() => setCaptureNotice(null), 3000);
@@ -334,29 +340,37 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
     const allocatedId = referenceId || generateInspectionReferenceId();
     setDocketNumber(allocatedId);
 
-    setScanStep('Reading packaging label with AI Vision...');
-    const stepTimer1 = setTimeout(() => {
-      setScanStep('Extracting Product Name, Net Weight, MRP & Unit Price...');
-    }, 1200);
-    const stepTimer2 = setTimeout(() => {
-      setScanStep('Checking Dates, Manufacturer Address & Customer Care...');
-    }, 2400);
-    const stepTimer3 = setTimeout(() => {
-      setScanStep('Verifying text size and readability across all mandatory features...');
-    }, 3600);
-
+    setScanStep('Optimizing packaging photos for rapid analysis...');
     const extrasToPass = extraImages ?? supportingImages;
 
     try {
+      const [optPrimary, optBack, optSide, optMacro] = await Promise.all([
+        optimizeImageForOcr(primaryImg, 1600, 0.85),
+        backImg ? optimizeImageForOcr(backImg, 1600, 0.85) : Promise.resolve(undefined),
+        sideImg ? optimizeImageForOcr(sideImg, 1600, 0.85) : Promise.resolve(undefined),
+        macroImg ? optimizeImageForOcr(macroImg, 1600, 0.85) : Promise.resolve(undefined),
+      ]);
+
+      setScanStep('Reading packaging label with AI Vision...');
+      const stepTimer1 = setTimeout(() => {
+        setScanStep('Extracting Product Name, Net Weight, MRP & Unit Price...');
+      }, 1200);
+      const stepTimer2 = setTimeout(() => {
+        setScanStep('Checking Dates, Manufacturer Address & Customer Care...');
+      }, 2400);
+      const stepTimer3 = setTimeout(() => {
+        setScanStep('Verifying text size and readability across all mandatory features...');
+      }, 3600);
+
       const result = await analyzeProductImage(
-        primaryImg,
-        primaryImg.startsWith('data:image/svg') ? 'image/svg+xml' : 'image/jpeg',
+        optPrimary,
+        optPrimary.startsWith('data:image/svg') ? 'image/svg+xml' : 'image/jpeg',
         {
           category: commodityCategory,
           packageType,
-          backPanelBase64: backImg && backImg !== primaryImg ? backImg : undefined,
-          sidePanelBase64: sideImg && sideImg !== primaryImg ? sideImg : undefined,
-          macroBase64: macroImg && macroImg !== primaryImg ? macroImg : undefined,
+          backPanelBase64: optBack && optBack !== optPrimary ? optBack : undefined,
+          sidePanelBase64: optSide && optSide !== optPrimary ? optSide : undefined,
+          macroBase64: optMacro && optMacro !== optPrimary ? optMacro : undefined,
           additionalImages: extrasToPass.length > 0 ? extrasToPass : undefined,
           inspectorInfo: {
             name: officerName,
@@ -377,12 +391,16 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
       }
 
       result.images = {
-        pdpImage: primaryImg,
-        backPanelImage: backImg && backImg !== primaryImg ? backImg : undefined,
-        sidePanelImage: sideImg && sideImg !== primaryImg ? sideImg : undefined,
-        mrpStampImage: macroImg && macroImg !== primaryImg ? macroImg : undefined,
+        pdpImage: optPrimary,
+        backPanelImage: optBack && optBack !== optPrimary ? optBack : undefined,
+        sidePanelImage: optSide && optSide !== optPrimary ? optSide : undefined,
+        mrpStampImage: optMacro && optMacro !== optPrimary ? optMacro : undefined,
         supportingImages: extrasToPass.length > 0 ? extrasToPass : undefined,
       };
+
+      clearTimeout(stepTimer1);
+      clearTimeout(stepTimer2);
+      clearTimeout(stepTimer3);
 
       onScanComplete(result);
     } catch (err: any) {
@@ -392,9 +410,6 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
           'Failed to extract packaging label text. Please make sure the photo is sharp and well-lit, then try again.'
       );
     } finally {
-      clearTimeout(stepTimer1);
-      clearTimeout(stepTimer2);
-      clearTimeout(stepTimer3);
       setIsScanning(false);
     }
   };
@@ -405,14 +420,9 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
 
     const fileList = Array.from(files);
 
-    // Read all uploaded pictures at once concurrently
+    // Read and optimize all uploaded pictures concurrently
     const readPromises = fileList.map((file) => {
-      return new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
+      return optimizeImageForOcr(file, 1600, 0.85);
     });
 
     try {
@@ -1382,6 +1392,12 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                   <span>
                     {scanError.includes('GEMINI_API_KEY')
                       ? 'Server Connected: Gemini API Key Required'
+                      : scanError.includes('503') ||
+                        scanError.toLowerCase().includes('high demand') ||
+                        scanError.toLowerCase().includes('unavailable')
+                      ? 'AI Vision Service High Demand'
+                      : scanError.toLowerCase().includes('timeout')
+                      ? 'Connection Timed Out'
                       : scanError.includes('APK_SANDBOX_AUTH_REDIRECT') || scanError.includes('status 200')
                       ? 'Android APK: Server Connection Required'
                       : 'Scan Notice'}
@@ -1391,10 +1407,29 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                 <p className="text-[11px] leading-relaxed text-rose-800">
                   {scanError.includes('GEMINI_API_KEY')
                     ? 'Your phone is successfully connected to your PC server! To enable AI label inspection, your PC needs a GEMINI_API_KEY in its .env file.'
+                    : scanError.includes('503') ||
+                      scanError.toLowerCase().includes('high demand') ||
+                      scanError.toLowerCase().includes('unavailable')
+                    ? 'Google Gemini AI servers are currently experiencing a brief traffic surge. The app has switched to resilient high-availability fallback models. Tap "Retry Scan" to analyze your packaging now.'
+                    : scanError.toLowerCase().includes('timeout')
+                    ? 'The analysis request timed out waiting for the server. Packaging photos are now automatically compressed for fast transfer. Please check that your PC server is running ("npm run dev") and your phone is on the same Wi-Fi network.'
                     : scanError.includes('APK_SANDBOX_AUTH_REDIRECT') || scanError.includes('status 200')
                     ? 'The standalone Android APK cannot connect to the cloud development sandbox directly (login redirect). Please point the app to the backend server running on your computer or a deployed host.'
                     : scanError}
                 </p>
+
+                {/* Show server connected badge on upstream AI errors */}
+                {(scanError.includes('503') ||
+                  scanError.toLowerCase().includes('high demand') ||
+                  scanError.toLowerCase().includes('unavailable')) && (
+                  <div className="p-2.5 bg-emerald-50 rounded-lg border border-emerald-200 flex items-center justify-between text-[11px] text-emerald-800">
+                    <div className="flex items-center gap-1.5 font-medium">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                      <span>Phone connected to server successfully</span>
+                    </div>
+                    <span className="text-[10px] text-emerald-700 font-mono font-bold bg-emerald-100/80 px-2 py-0.5 rounded">Backend Online</span>
+                  </div>
+                )}
 
                 {scanError.includes('GEMINI_API_KEY') ? (
                   <div className="p-3 bg-white/90 rounded-lg border border-amber-200 space-y-2 text-[11px] text-slate-700">
@@ -1420,7 +1455,8 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                 ) : (scanError.includes('APK_SANDBOX_AUTH_REDIRECT') ||
                   scanError.includes('status 200') ||
                   scanError.includes('Failed to fetch') ||
-                  isNativeApkRuntime()) ? (
+                  scanError.includes('NetworkError') ||
+                  scanError.includes('ECONNREFUSED')) ? (
                   <div className="p-2.5 bg-white/80 rounded-lg border border-rose-200 space-y-1 text-[11px] text-slate-700">
                     <div className="font-bold text-slate-800 flex items-center gap-1.5">
                       <Server className="w-3 h-3 text-emerald-600" />

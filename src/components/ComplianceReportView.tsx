@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { exportToPdf } from '../utils/pdfExport';
 import {
   ShieldCheck,
   AlertTriangle,
@@ -53,15 +54,19 @@ export const ComplianceReportView: React.FC<ComplianceReportViewProps> = ({
   const [showLegalRef, setShowLegalRef] = useState<boolean>(false);
   const [isAuditingQr, setIsAuditingQr] = useState<boolean>(false);
   const [qrAuditLiveResult, setQrAuditLiveResult] = useState<any>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const componentRef = useRef<HTMLDivElement>(null);
 
   const isCompliant = report.overallVerdict === 'COMPLIANT';
   const isSerious = report.overallVerdict === 'SERIOUS_VIOLATION';
 
   const printReport = () => {
-    try {
-      window.print();
-    } catch (err) {
-      console.error('Failed to trigger print:', err);
+    if (componentRef.current) {
+      exportToPdf(
+        componentRef.current,
+        `LMPC_Report_${report.productName?.replace(/\s+/g, '_') || 'Product'}.pdf`,
+        setIsExporting
+      );
     }
   };
 
@@ -207,7 +212,7 @@ export const ComplianceReportView: React.FC<ComplianceReportViewProps> = ({
   const totalCount = mandatoryFeatureCards.length;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 print:p-0 print:m-0 bg-slate-50 min-h-screen">
+    <div ref={componentRef} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 print:p-0 print:m-0 bg-slate-50 min-h-screen">
       {/* Action Bar */}
       <div id="report-action-bar" className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 print:hidden">
         <button
@@ -224,7 +229,6 @@ export const ComplianceReportView: React.FC<ComplianceReportViewProps> = ({
               onClick={onOpenRemediation}
               className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-3.5 py-2 rounded-xl transition-colors cursor-pointer shrink-0"
             >
-              <Sparkles className="w-4 h-4 text-amber-700" />
               <span>Artwork Fix Specs</span>
             </button>
           )}
@@ -250,11 +254,12 @@ export const ComplianceReportView: React.FC<ComplianceReportViewProps> = ({
 
           <button
             onClick={printReport}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 px-3.5 py-2 rounded-xl shadow-2xs transition-colors cursor-pointer shrink-0"
-            title="Print Inspection Report"
+            disabled={isExporting}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 px-3.5 py-2 rounded-xl shadow-2xs transition-colors cursor-pointer shrink-0 disabled:opacity-60"
+            title="Download PDF Report"
           >
             <Printer className="w-3.5 h-3.5 text-slate-600" />
-            <span>Print</span>
+            <span>{isExporting ? 'Generating PDF...' : 'Download PDF'}</span>
           </button>
         </div>
       </div>

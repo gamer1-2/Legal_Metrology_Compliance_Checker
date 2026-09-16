@@ -4,6 +4,7 @@
  */
 
 import { BarcodeVerificationResult } from '../types/compliance';
+import { getApiBaseUrl } from '../services/complianceEngine';
 
 // Lazy loader for @zxing/library to support both ESM Vite bundling and Node server
 let zxingLibPromise: Promise<any> | null = null;
@@ -160,6 +161,15 @@ export function validateGs1CheckDigit(fullCode: string): {
   isValid: boolean;
   actualCheckDigit: number;
   calculatedCheckDigit: number;
+  mathBreakdown?: {
+    digits: number[];
+    weights: number[];
+    products: number[];
+    weightedSum: number;
+    moduloRemainder: number;
+    calculatedCheckDigit: number;
+    formulaExplanation: string;
+  };
 } {
   const clean = fullCode.replace(/\D/g, '');
   if (clean.length < 8 || clean.length > 14) {
@@ -168,12 +178,40 @@ export function validateGs1CheckDigit(fullCode: string): {
 
   const digitsWithoutCheck = clean.slice(0, -1);
   const actualCheckDigit = Number(clean.slice(-1));
-  const calculatedCheckDigit = calculateGs1CheckDigit(digitsWithoutCheck);
+
+  const digits = digitsWithoutCheck.split('').map(Number);
+  const len = digits.length;
+  const weights: number[] = [];
+  const products: number[] = [];
+  let weightedSum = 0;
+
+  // Weight pattern from right to left: 3, 1, 3, 1...
+  // For standard 12-digit payload (EAN-13), left-to-right is 1, 3, 1, 3, 1, 3, 1, 3, 1, 3, 1, 3
+  for (let i = 0; i < len; i++) {
+    const distFromRight = len - 1 - i;
+    const weight = distFromRight % 2 === 0 ? 3 : 1;
+    const prod = digits[i] * weight;
+    weights.push(weight);
+    products.push(prod);
+    weightedSum += prod;
+  }
+
+  const moduloRemainder = weightedSum % 10;
+  const calculatedCheckDigit = moduloRemainder === 0 ? 0 : 10 - moduloRemainder;
 
   return {
     isValid: actualCheckDigit === calculatedCheckDigit,
     actualCheckDigit,
     calculatedCheckDigit,
+    mathBreakdown: {
+      digits,
+      weights,
+      products,
+      weightedSum,
+      moduloRemainder,
+      calculatedCheckDigit,
+      formulaExplanation: `Weighted Sum: Σ(dᵢ × wᵢ) = ${weightedSum}. Remainder: ${weightedSum} % 10 = ${moduloRemainder}. Check Digit: (10 - ${moduloRemainder}) % 10 = ${calculatedCheckDigit}.`,
+    },
   };
 }
 
@@ -238,7 +276,7 @@ export function verifyBarcodeProvenance(
     };
   }
 
-  const { isValid: isCheckDigitValid, actualCheckDigit, calculatedCheckDigit } = validateGs1CheckDigit(digitsOnly);
+  const { isValid: isCheckDigitValid, actualCheckDigit, calculatedCheckDigit, mathBreakdown } = validateGs1CheckDigit(digitsOnly);
   const { prefix, country: countryOfIssuance, region } = resolveGs1Country(digitsOnly);
 
   // Normalize text country of origin for comparison
@@ -290,6 +328,7 @@ export function verifyBarcodeProvenance(
     isCheckDigitValid,
     calculatedCheckDigit,
     actualCheckDigit,
+    mathBreakdown,
     textDeclaredOrigin: textDeclaredCountry,
     provenanceMatchStatus,
     complianceVerdict,
@@ -298,43 +337,37 @@ export function verifyBarcodeProvenance(
   };
 }
 
+export interface DecodedBarcodeResult {
+  text: string;
+  format: string;
+  declaredOrigin?: string;
+  manufacturerDetails?: string;
+  source?: 'NATIVE_BARCODE_DETECTOR' | 'ZXING_OPTICAL' | 'AI_VISION_SERVER';
+}
+
 /**
- * Attempts real client-side barcode decoding from an image using ZXing
+ * Attempts robust barcode decoding from an image:
+ * 1. Native BarcodeDetector (instant on Chromium / Android WebView)
+ * 2. Multi-scale & rotated ZXing optical decoder
+ * 3. Server-side AI Vision OCR fallback (Gemini)
  */
 export async function decodeBarcodeFromCanvasOrImage(
   imageSource: string | HTMLCanvasElement | HTMLImageElement
-): Promise<{ text: string; format: string } | null> {
+): Promise<DecodedBarcodeResult | null> {
+  if (typeof document === 'undefined') return null; // Server guard
+
   try {
-    const ZXing = await getZXing();
-    const {
-      MultiFormatReader,
-      BarcodeFormat,
-      DecodeHintType,
-      RGBLuminanceSource,
-      BinaryBitmap,
-      HybridBinarizer,
-    } = ZXing;
+    let sourceCanvas: HTMLCanvasElement;
+    let initialDataUrl = typeof imageSource === 'string' ? imageSource : '';
 
-    const hints = new Map();
-    hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-      BarcodeFormat.EAN_13,
-      BarcodeFormat.UPC_A,
-      BarcodeFormat.EAN_8,
-      BarcodeFormat.CODE_128,
-      BarcodeFormat.DATA_MATRIX,
-      BarcodeFormat.QR_CODE,
-    ]);
-    hints.set(DecodeHintType.TRY_HARDER, true);
-
-    const reader = new MultiFormatReader();
-    reader.setHints(hints);
-
-    let canvas: HTMLCanvasElement;
-    if (typeof document === 'undefined') return null; // Server guard
     if (imageSource instanceof HTMLCanvasElement) {
-      canvas = imageSource;
+      sourceCanvas = imageSource;
+      try {
+        initialDataUrl = sourceCanvas.toDataURL('image/jpeg', 0.85);
+      } catch {
+        // canvas might be tainted
+      }
     } else {
-      // Load image into temporary canvas
       const img = new Image();
       img.crossOrigin = 'anonymous';
       await new Promise<void>((resolve, reject) => {
@@ -343,38 +376,167 @@ export async function decodeBarcodeFromCanvasOrImage(
         img.src = typeof imageSource === 'string' ? imageSource : imageSource.src;
       });
 
-      canvas = document.createElement('canvas');
-      canvas.width = img.naturalWidth || img.width;
-      canvas.height = img.naturalHeight || img.height;
-      const ctx = canvas.getContext('2d');
+      sourceCanvas = document.createElement('canvas');
+      sourceCanvas.width = img.naturalWidth || img.width;
+      sourceCanvas.height = img.naturalHeight || img.height;
+      const ctx = sourceCanvas.getContext('2d');
       if (!ctx) return null;
       ctx.drawImage(img, 0, 0);
     }
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const luminances = new Uint8ClampedArray(canvas.width * canvas.height);
-    for (let i = 0; i < luminances.length; i++) {
-      const r = imgData.data[i * 4];
-      const g = imgData.data[i * 4 + 1];
-      const b = imgData.data[i * 4 + 2];
-      luminances[i] = ((r + g + b) / 3) | 0;
+    // 1. Try Native BarcodeDetector API (fastest, standard on Android WebView / Chrome)
+    if (typeof window !== 'undefined' && 'BarcodeDetector' in window) {
+      try {
+        const BarcodeDetectorClass = (window as any).BarcodeDetector;
+        const detector = new BarcodeDetectorClass({
+          formats: ['ean_13', 'upc_a', 'ean_8', 'code_128', 'code_39', 'qr_code'],
+        });
+        const barcodes = await detector.detect(sourceCanvas);
+        if (barcodes && barcodes.length > 0) {
+          const raw = barcodes[0].rawValue;
+          if (raw && raw.trim()) {
+            return {
+              text: raw.trim(),
+              format: barcodes[0].format?.toUpperCase() || 'EAN_13',
+              source: 'NATIVE_BARCODE_DETECTOR',
+            };
+          }
+        }
+      } catch (err) {
+        console.warn('Native BarcodeDetector pass error:', err);
+      }
     }
 
-    const luminanceSource = new RGBLuminanceSource(luminances, canvas.width, canvas.height);
-    const binaryBitmap = new BinaryBitmap(new HybridBinarizer(luminanceSource));
+    // 2. Optical ZXing Multi-scale & Rotation Passes
+    try {
+      const ZXing = await getZXing();
+      const {
+        MultiFormatReader,
+        BarcodeFormat,
+        DecodeHintType,
+        RGBLuminanceSource,
+        BinaryBitmap,
+        HybridBinarizer,
+      } = ZXing;
 
-    const result = reader.decode(binaryBitmap);
-    if (result) {
-      return {
-        text: result.getText(),
-        format: BarcodeFormat ? BarcodeFormat[result.getBarcodeFormat()] || 'EAN_13' : 'EAN_13',
-      };
+      const hints = new Map();
+      hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+        BarcodeFormat.EAN_13,
+        BarcodeFormat.UPC_A,
+        BarcodeFormat.EAN_8,
+        BarcodeFormat.CODE_128,
+        BarcodeFormat.DATA_MATRIX,
+        BarcodeFormat.QR_CODE,
+      ]);
+      hints.set(DecodeHintType.TRY_HARDER, true);
+
+      const reader = new MultiFormatReader();
+      reader.setHints(hints);
+
+      // Create downscaled canvas for optimal ZXing scan line resolution (max 1000px)
+      const origW = sourceCanvas.width;
+      const origH = sourceCanvas.height;
+      const maxDim = 1000;
+      const scale = Math.min(1, maxDim / Math.max(origW, origH));
+      const targetW = Math.max(1, Math.round(origW * scale));
+      const targetH = Math.max(1, Math.round(origH * scale));
+
+      const scaledCanvas = document.createElement('canvas');
+      scaledCanvas.width = targetW;
+      scaledCanvas.height = targetH;
+      const scaledCtx = scaledCanvas.getContext('2d');
+      if (scaledCtx) {
+        scaledCtx.drawImage(sourceCanvas, 0, 0, targetW, targetH);
+
+        const tryDecodeCanvas = (c: HTMLCanvasElement) => {
+          const cCtx = c.getContext('2d');
+          if (!cCtx) return null;
+          const imgData = cCtx.getImageData(0, 0, c.width, c.height);
+          const luminances = new Uint8ClampedArray(c.width * c.height);
+          for (let i = 0; i < luminances.length; i++) {
+            const r = imgData.data[i * 4];
+            const g = imgData.data[i * 4 + 1];
+            const b = imgData.data[i * 4 + 2];
+            luminances[i] = ((r + g + b) / 3) | 0;
+          }
+          const luminanceSource = new RGBLuminanceSource(luminances, c.width, c.height);
+          const binaryBitmap = new BinaryBitmap(new HybridBinarizer(luminanceSource));
+          return reader.decode(binaryBitmap);
+        };
+
+        // Pass A: Normal orientation
+        try {
+          const res = tryDecodeCanvas(scaledCanvas);
+          if (res) {
+            return {
+              text: res.getText(),
+              format: BarcodeFormat ? BarcodeFormat[res.getBarcodeFormat()] || 'EAN_13' : 'EAN_13',
+              source: 'ZXING_OPTICAL',
+            };
+          }
+        } catch {
+          // Continue to rotated pass
+        }
+
+        // Pass B: Rotated 90 degrees (for vertical barcodes on bottles/boxes)
+        try {
+          const rotCanvas = document.createElement('canvas');
+          rotCanvas.width = targetH;
+          rotCanvas.height = targetW;
+          const rotCtx = rotCanvas.getContext('2d');
+          if (rotCtx) {
+            rotCtx.translate(targetH / 2, targetW / 2);
+            rotCtx.rotate((90 * Math.PI) / 180);
+            rotCtx.drawImage(scaledCanvas, -targetW / 2, -targetH / 2);
+            const res = tryDecodeCanvas(rotCanvas);
+            if (res) {
+              return {
+                text: res.getText(),
+                format: BarcodeFormat ? BarcodeFormat[res.getBarcodeFormat()] || 'EAN_13' : 'EAN_13',
+                source: 'ZXING_OPTICAL',
+              };
+            }
+          }
+        } catch {
+          // Continue to server fallback
+        }
+      }
+    } catch (zxingErr) {
+      console.warn('ZXing optical pass failed:', zxingErr);
     }
+
+    // 3. Server-side AI Vision Fallback (Gemini OCR)
+    // If optical lines were unreadable due to reflection/angle, AI reads the barcode digits
+    if (initialDataUrl || sourceCanvas) {
+      try {
+        const payloadDataUrl = initialDataUrl || sourceCanvas.toDataURL('image/jpeg', 0.85);
+        const baseUrl = getApiBaseUrl();
+        const response = await fetch(`${baseUrl}/api/decode-barcode`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageBase64: payloadDataUrl }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.detected && data.barcode) {
+            return {
+              text: String(data.barcode).replace(/\D/g, ''),
+              format: data.symbology || 'EAN_13',
+              declaredOrigin: data.declaredOrigin,
+              manufacturerDetails: data.manufacturerDetails,
+              source: 'AI_VISION_SERVER',
+            };
+          }
+        }
+      } catch (serverErr) {
+        console.warn('Server barcode decode fallback error:', serverErr);
+      }
+    }
+
     return null;
-  } catch {
-    // No barcode recognized on this pass
+  } catch (err) {
+    console.warn('Barcode decoding pipeline error:', err);
     return null;
   }
 }
