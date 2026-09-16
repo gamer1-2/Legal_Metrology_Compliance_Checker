@@ -41,6 +41,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 @keyframes calibration-drift { from { transform: translate3d(-.5%,0,0) scale(1); } to { transform: translate3d(.8%,.5%,0) scale(1.03); } }
 .font-mono, code, .font-mono * { font-family: 'DM Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
 h1, h2, h3 { letter-spacing: -.025em; }
+.app-command-header { box-shadow: 0 1px 0 rgba(23,23,23,.04), 0 5px 18px rgba(23,23,23,.025); }
+.brand-mark { position: relative; box-shadow: inset 0 0 0 1px rgba(255,255,255,.18), 0 5px 16px rgba(228,87,46,.16); }
+.brand-mark::after { content: ''; position: absolute; width: 5px; height: 5px; right: 4px; top: 4px; border-radius: 999px; background: var(--brass); box-shadow: 0 0 0 2px rgba(255,252,246,.28); }
 
 /* Shared token bridge for the existing component library. */
 .bg-slate-100 { background-color: var(--paper) !important; }

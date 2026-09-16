@@ -181,7 +181,7 @@ export default function App() {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top App Bar with Breadcrumbs & Fast Action Buttons */}
-        <header className="bg-white border-b border-slate-200 px-4 sm:px-6 py-3 shrink-0 flex items-center justify-between gap-4 select-none print:hidden">
+        <header className="app-command-header bg-white border-b border-slate-200 px-4 sm:px-6 py-3 shrink-0 flex items-center justify-between gap-4 select-none print:hidden">
           <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={() => setIsMobileMenuOpen(true)}
@@ -194,10 +194,19 @@ export default function App() {
               <span className="font-mono text-[10px] tracking-[.15em] text-orange-600 hidden sm:inline">METROLOGY DESK</span>
               <ChevronRight className="w-3.5 h-3.5 text-slate-400 hidden sm:inline" />
               <span className="font-semibold text-slate-900">{pageTitles[activePage]}</span>
+              <span className="hidden lg:inline-flex items-center gap-2 ml-3 pl-3 border-l border-slate-200 text-[10px] font-mono tracking-[.12em] text-slate-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#2f6b4f] shadow-[0_0_0_3px_rgba(47,107,79,.12)]" />
+                FIELD SYSTEM / ONLINE
+              </span>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 border border-slate-200 bg-slate-50 text-[10px] font-mono text-slate-500" title="Inspection standard in force">
+              <span className="text-orange-600 font-bold">LM</span>
+              <span className="text-slate-300">/</span>
+              <span>2011 · USP 2022</span>
+            </div>
             <button
               onClick={() => setIsServerModalOpen(true)}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-colors cursor-pointer"
