@@ -23,6 +23,7 @@ import { NoticeGeneratorModal } from './components/NoticeGeneratorModal';
 import { ArtworkRemediationModal } from './components/ArtworkRemediationModal';
 import { WeightToleranceModal } from './components/WeightToleranceModal';
 import { BackendConnectionModal } from './components/BackendConnectionModal';
+import { LoginView } from './components/LoginView';
 import { InspectionResult, UserRole } from './types/compliance';
 import {
   getSavedInspections,
@@ -53,6 +54,7 @@ import {
 export default function App() {
   const [activePage, setActivePage] = useState<AppPage>('scan');
   const [userRole, setUserRole] = useState<UserRole>('INSPECTOR');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentReport, setCurrentReport] = useState<InspectionResult | null>(null);
   const [inspections, setInspections] = useState<InspectionResult[]>([]);
   const [isScanning, setIsScanning] = useState(false);
@@ -148,6 +150,10 @@ export default function App() {
     currentReport && currentReport.overallVerdict !== 'COMPLIANT'
       ? (currentReport.violationsCount?.critical || 0) + (currentReport.violationsCount?.major || 0)
       : 0;
+
+  if (!isAuthenticated) {
+    return <LoginView onLogin={(role) => { setUserRole(role); setIsAuthenticated(true); }} />;
+  }
 
   const pageTitles: Record<AppPage, string> = {
     scan: 'Product Scanner',

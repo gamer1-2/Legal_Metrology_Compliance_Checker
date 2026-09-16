@@ -70,6 +70,18 @@ h1, h2, h3 { letter-spacing: -.025em; }
 .scanner-page .inspection-hero:hover::before { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) { [data-reveal], .workflow-step { opacity: 1; transform: none; transition: none; } }
 
+/* Entry experience: editorial hero imagery, not decorative wallpaper. */
+.login-visual-image { background: linear-gradient(90deg, rgba(23,23,23,.94) 0%, rgba(23,23,23,.72) 52%, rgba(23,23,23,.35) 100%), url('/inspection-workbench.jpg') center / cover no-repeat; transform: scale(1.04); animation: login-image-drift 18s ease-in-out infinite alternate; }
+.login-grid { opacity: .22; background-image: linear-gradient(rgba(255,252,246,.35) 1px, transparent 1px), linear-gradient(90deg, rgba(255,252,246,.35) 1px, transparent 1px); background-size: 40px 40px; mask-image: linear-gradient(90deg, black, transparent 82%); animation: login-grid-drift 14s ease-in-out infinite alternate; }
+.login-visual::after { content: ''; position: absolute; width: 260px; height: 260px; right: 8%; top: 18%; border: 1px solid rgba(247,216,206,.38); border-radius: 50%; box-shadow: 0 0 0 26px rgba(247,216,206,.04), 0 0 0 52px rgba(247,216,206,.025); animation: login-pulse 5s ease-in-out infinite; }
+.login-role { min-height: 148px; }
+.login-submit { box-shadow: 0 10px 24px rgba(23,23,23,.12); transition: background-color 180ms var(--ease-out), transform 180ms var(--ease-out), box-shadow 180ms var(--ease-out); }
+.login-submit:hover { transform: translateY(-2px); box-shadow: 0 14px 28px rgba(23,23,23,.16); }
+@keyframes login-image-drift { from { transform: scale(1.04) translate3d(0, 0, 0); } to { transform: scale(1.1) translate3d(-1.5%, -1%, 0); } }
+@keyframes login-grid-drift { from { transform: translate3d(-1%, 0, 0); } to { transform: translate3d(2%, 1%, 0); } }
+@keyframes login-pulse { 0%, 100% { opacity: .55; transform: scale(.98); } 50% { opacity: .9; transform: scale(1.02); } }
+@media (prefers-reduced-motion: reduce) { .login-visual-image, .login-grid, .login-visual::after { animation: none; } .login-submit:hover { transform: none; } }
+
 /* Shared token bridge for the existing component library. */
 .bg-slate-100 { background-color: var(--paper) !important; }
 .bg-slate-50 { background-color: var(--surface-2) !important; }
