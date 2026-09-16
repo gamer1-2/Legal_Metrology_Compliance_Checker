@@ -33,7 +33,12 @@ button { transition: background-color 160ms var(--ease-out), color 160ms var(--e
 button:active { transform: scale(.985); }
 button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--vermilion); outline-offset: 2px; }
 
-#root { background-image: linear-gradient(rgba(23,23,23,.018) 1px, transparent 1px), linear-gradient(90deg, rgba(23,23,23,.018) 1px, transparent 1px); background-size: 32px 32px; }
+#root { position: relative; isolation: isolate; background-image: linear-gradient(rgba(23,23,23,.018) 1px, transparent 1px), linear-gradient(90deg, rgba(23,23,23,.018) 1px, transparent 1px); background-size: 32px 32px; }
+#root::before { content: ''; position: fixed; z-index: -1; inset: 0; pointer-events: none; background: linear-gradient(90deg, rgba(247,244,237,.98) 0%, rgba(247,244,237,.91) 38%, rgba(247,244,237,.48) 72%, rgba(247,244,237,.72) 100%), url('/inspection-workbench.jpg') center right / cover no-repeat; opacity: .2; transform: scale(1.03); animation: workbench-drift 18s ease-in-out infinite alternate; }
+#root::after { content: ''; position: fixed; z-index: -1; inset: 0; pointer-events: none; background: url('/precision-overlay.png') center / cover no-repeat; opacity: .08; mix-blend-mode: multiply; animation: calibration-drift 12s ease-in-out infinite alternate; }
+#root > * { position: relative; z-index: 1; }
+@keyframes workbench-drift { from { transform: scale(1.03) translate3d(0,0,0); } to { transform: scale(1.08) translate3d(-1.2%, -0.7%, 0); } }
+@keyframes calibration-drift { from { transform: translate3d(-.5%,0,0) scale(1); } to { transform: translate3d(.8%,.5%,0) scale(1.03); } }
 .font-mono, code, .font-mono * { font-family: 'DM Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
 h1, h2, h3 { letter-spacing: -.025em; }
 
