@@ -44,6 +44,16 @@ h1, h2, h3 { letter-spacing: -.025em; }
 .app-command-header { box-shadow: 0 1px 0 rgba(23,23,23,.04), 0 5px 18px rgba(23,23,23,.025); }
 .brand-mark { position: relative; box-shadow: inset 0 0 0 1px rgba(255,255,255,.18), 0 5px 16px rgba(228,87,46,.16); }
 .brand-mark::after { content: ''; position: absolute; width: 5px; height: 5px; right: 4px; top: 4px; border-radius: 999px; background: var(--brass); box-shadow: 0 0 0 2px rgba(255,252,246,.28); }
+.scanner-page { position: relative; }
+.scanner-page::before { content: 'FIELD / 01'; position: absolute; right: 2.5rem; top: 1.1rem; color: rgba(119,116,109,.55); font: 10px 'DM Mono', monospace; letter-spacing: .18em; pointer-events: none; }
+.workflow-rail { position: relative; }
+.workflow-step { position: relative; z-index: 1; }
+.workflow-index { display: inline-flex; align-items: center; justify-content: center; width: 25px; height: 25px; border: 1px solid var(--border); color: var(--vermilion); background: var(--surface); font: 10px 'DM Mono', monospace; }
+.workflow-step strong { letter-spacing: .01em; }
+.inspection-hero .workflow-rail::before { content: ''; position: absolute; left: 12px; right: 12px; top: 12px; border-top: 1px solid rgba(216,211,200,.7); }
+.inspection-hero .workflow-rail > * { background: var(--surface); }
+.scanner-page main, .scanner-page section { scroll-margin-top: 1rem; }
+@media (max-width: 640px) { .scanner-page::before { display: none; } .inspection-hero .workflow-rail::before { display: none; } .workflow-step { width: 50%; } }
 
 /* Shared token bridge for the existing component library. */
 .bg-slate-100 { background-color: var(--paper) !important; }

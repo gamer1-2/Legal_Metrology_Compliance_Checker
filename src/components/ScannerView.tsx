@@ -557,12 +557,12 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
   ];
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+    <div className="scanner-page max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-8 space-y-6">
       {/* Hidden canvas for snapshot rendering */}
       <canvas ref={canvasRef} className="hidden" />
 
       {/* Inspection workspace header */}
-      <div className="inspection-hero bg-white rounded-2xl p-6 shadow-xs border border-slate-200 relative overflow-hidden">
+      <div className="inspection-hero bg-white rounded-2xl p-6 sm:p-8 shadow-xs border border-slate-200 relative overflow-hidden">
         <div className="absolute right-0 top-0 h-full w-1 bg-orange-500" aria-hidden="true" />
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -574,9 +574,25 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
             <h1 className="text-2xl font-bold text-slate-900 mt-2">
               Product label inspection
             </h1>
-            <p className="text-xs text-slate-500 mt-1 max-w-2xl">
+            <p className="text-xs text-slate-500 mt-1 max-w-2xl leading-relaxed">
               Acquire the evidence set, extract mandatory declarations, and verify the package against Legal Metrology requirements.
             </p>
+            <div className="workflow-rail mt-6 flex flex-wrap items-center gap-y-3" aria-label="Inspection workflow">
+              {[
+                ['01', 'Capture', 'Evidence set'],
+                ['02', 'Extract', 'Declarations'],
+                ['03', 'Verify', 'Rule checks'],
+                ['04', 'Act', 'Decision record'],
+              ].map(([step, label, detail], index) => (
+                <React.Fragment key={step}>
+                  <div className="workflow-step flex items-center gap-2.5 pr-4">
+                    <span className="workflow-index">{step}</span>
+                    <span><strong className="block text-[11px] text-slate-800">{label}</strong><small className="block text-[10px] text-slate-400">{detail}</small></span>
+                  </div>
+                  {index < 3 && <span className="workflow-connector hidden sm:block w-7 h-px bg-slate-200 mr-4" aria-hidden="true" />}
+                </React.Fragment>
+              ))}
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
